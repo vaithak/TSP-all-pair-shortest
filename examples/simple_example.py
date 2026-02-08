@@ -36,7 +36,7 @@ def main():
     
     # Create 100x100 grid (5m x 5m at 20 pixels/meter)
     pixels_per_meter = 20
-    grid_size = 100
+    grid_size = int(5 * pixels_per_meter)  # 100 pixels
     navigable_map = np.ones((grid_size, grid_size), dtype=bool)
     
     # Add vertical wall obstacle

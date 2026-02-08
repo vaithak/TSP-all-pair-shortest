@@ -23,7 +23,8 @@ std::pair<std::vector<int>, double> TSPSolver::solve(
     const int num_vehicles = 1;
     
     // Create routing index manager
-    RoutingIndexManager manager(num_nodes, num_vehicles, depot);
+    RoutingIndexManager manager(num_nodes, num_vehicles,
+                                 RoutingIndexManager::NodeIndex(depot));
     
     // Create routing model
     RoutingModel routing(manager);
@@ -47,7 +48,7 @@ std::pair<std::vector<int>, double> TSPSolver::solve(
         FirstSolutionStrategy::PATH_CHEAPEST_ARC);
     
     // Set time limit (optional, 30 seconds)
-    search_parameters.set_time_limit(absl::Seconds(30));
+    search_parameters.mutable_time_limit()->set_seconds(30);
     
     // Solve the problem
     const Assignment* solution = routing.SolveWithParameters(search_parameters);

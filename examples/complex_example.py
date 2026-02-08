@@ -94,7 +94,7 @@ def main():
     logger.info("\n[Step 2] Defining 10 waypoints...")
     
     waypoints = np.array([
-        [0.0, 0.0],       # 0: Center start
+        [-1.2, 0.0],       # 0: Center start
         [3.5, 3.5],       # 1: Top right quadrant
         [-3.5, 3.5],      # 2: Top left quadrant
         [-3.5, -3.5],     # 3: Bottom left quadrant
@@ -118,7 +118,7 @@ def main():
         pixels_per_meter=pixels_per_meter,
         astar_config={
             'waypoint_threshold': 0.3,
-            'dilation_radius': 0.15,  # Slightly larger safety margin
+            'dilation_radius': 0.25,  # Slightly larger safety margin
             'dilation_retry_step': 0.05,
         }
     )
