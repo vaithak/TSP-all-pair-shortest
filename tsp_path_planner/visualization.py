@@ -102,24 +102,6 @@ def visualize_grid(
     if waypoints is not None:
         # If we have TSP ordering, use it
         if ordered_indices is not None:
-            # Draw lines showing TSP order
-            for i in range(len(ordered_indices) - 1):
-                from_idx = ordered_indices[i]
-                to_idx = ordered_indices[i + 1]
-                
-                ax.annotate(
-                    '',
-                    xy=waypoints[to_idx],
-                    xytext=waypoints[from_idx],
-                    arrowprops=dict(
-                        arrowstyle='->',
-                        lw=2,
-                        color='red',
-                        alpha=0.6
-                    ),
-                    zorder=3
-                )
-            
             # Plot waypoints with TSP order numbers
             for i, idx in enumerate(ordered_indices):
                 color = 'green' if i == 0 else 'red' if i == len(ordered_indices)-1 else 'blue'
