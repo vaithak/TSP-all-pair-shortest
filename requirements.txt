@@ -1,0 +1,18 @@
+# Core dependencies
+numpy>=1.20.0
+matplotlib>=3.3.0
+scipy>=1.7.0
+
+# For C++ bindings (optional but recommended)
+pybind11>=2.10.0
+
+# For image/animation export
+Pillow>=8.0.0
+
+# Development dependencies (optional)
+pytest>=6.0
+pytest-cov>=2.0
+
+# Documentation (optional)
+sphinx>=4.0
+sphinx-rtd-theme>=1.0
