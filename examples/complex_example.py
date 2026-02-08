@@ -95,15 +95,15 @@ def main():
     
     waypoints = np.array([
         [-1.2, 0.0],       # 0: Center start
-        [3.5, 3.5],       # 1: Top right quadrant
-        [-3.5, 3.5],      # 2: Top left quadrant
-        [-3.5, -3.5],     # 3: Bottom left quadrant
-        [3.5, -3.5],      # 4: Bottom right quadrant
+        [2.2, 3.2],       # 1: Top right quadrant
+        [-2.2, 3.2],      # 2: Top left quadrant
+        [-1.8, -3.2],     # 3: Bottom left quadrant
+        [3.8, -3.5],      # 4: Bottom right quadrant
         [2.0, 0.5],       # 5: Right center
         [-2.0, 0.5],      # 6: Left center
         [0.5, 2.5],       # 7: Top center
         [0.5, -2.5],      # 8: Bottom center
-        [1.0, 1.0],       # 9: Near center
+        [1.3, 1.0],       # 9: Near center
     ])
     
     logger.info(f"  Number of waypoints: {len(waypoints)}")
