@@ -50,7 +50,7 @@ def main():
     logger.info("\n[Step 2] Defining waypoints...")
     
     waypoints = np.array([
-        [0.0, 0.0],      # Start point (center)
+        [0.0, -2.0],      # Start point (center)
         [2.0, 1.5],      # Top right
         [-1.0, 2.0],     # Top left
         [1.5, -1.5],     # Bottom right
