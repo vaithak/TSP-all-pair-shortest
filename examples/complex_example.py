@@ -51,11 +51,11 @@ def create_complex_grid(size=200, pixels_per_meter=20):
     
     # Add central obstacle (L-shape)
     navigable_map[80:120, 80:120] = False
-    navigable_map[80:95, 80:135] = False
+    navigable_map[60:75, 80:135] = False
     
     # Add scattered small obstacles
     obstacle_positions = [
-        (30, 30, 10, 10),
+        (30, 30, 30, 30),
         (30, 160, 10, 10),
         (160, 30, 10, 10),
         (160, 160, 10, 10),
