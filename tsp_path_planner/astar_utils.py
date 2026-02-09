@@ -281,7 +281,7 @@ def is_line_clear(
     x, y = x0, y0
     sx = 1 if x0 < x1 else -1
     sy = 1 if y0 < y1 else -1
-    # Check navigability along the line using map access pattern: map[x, y] where x=col, y=row
+    # Check navigability along the line using map access pattern: map[x, y] where x=row, y=col
     if dx > dy:
         err = dx / 2.0
         while x != x1:
