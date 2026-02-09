@@ -96,7 +96,7 @@ def main():
     waypoints = np.array([
         [-1.2, 0.0],       # 0: Center start
         [2.2, 3.2],       # 1: Top right quadrant
-        [-2.2, 3.2],      # 2: Top left quadrant
+        [-1.8, 3.2],      # 2: Top left quadrant
         [-1.8, -3.2],     # 3: Bottom left quadrant
         [3.8, -3.5],      # 4: Bottom right quadrant
         [2.0, 0.5],       # 5: Right center
@@ -114,7 +114,7 @@ def main():
     logger.info("\n[Step 3] Creating TSP path planner...")
     
     planner = TSPPathPlanner(
-        navigable_map=navigable_map,
+        navigable_map=navigable_map.T,
         pixels_per_meter=pixels_per_meter,
         astar_config={
             'waypoint_threshold': 0.3,

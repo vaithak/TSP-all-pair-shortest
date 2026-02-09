@@ -63,11 +63,11 @@ def visualize_grid(
     map_image[navigable_map] = [1.0, 1.0, 1.0]  # White for navigable
     map_image[~navigable_map] = [0.2, 0.2, 0.2]  # Dark gray for obstacles
     
-    # Display map (flip vertically because image origin is top-left)
+    # Display map
     ax.imshow(
         map_image,
         extent=[-width_m/2, width_m/2, -height_m/2, height_m/2],
-        origin='lower',
+        origin='upper',
         zorder=0
     )
     
@@ -216,7 +216,7 @@ def create_animation(
     ax.imshow(
         map_image,
         extent=[-width_m/2, width_m/2, -height_m/2, height_m/2],
-        origin='lower',
+        origin='upper',
         zorder=0
     )
     
