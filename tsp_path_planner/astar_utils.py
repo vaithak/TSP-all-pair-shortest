@@ -43,10 +43,11 @@ def xy_to_px(
         Pixel positions [N, 2] where each row is [col, row]
         Note: To access map, use map[result[i, 1], result[i, 0]]
     """
-    scaled = np.rint(points * pixels_per_meter)
-    col = scaled[:, 0] + episode_pixel_origin[1]
-    row = scaled[:, 1] + episode_pixel_origin[0]
-    return np.column_stack([col, row]).astype(int)
+    # Reverse [x,y] to [y,x], scale, and translate
+    px = np.rint(points[:, ::-1] * pixels_per_meter) + episode_pixel_origin
+    # Flip row coordinate (map origin is top-left, world origin is center)
+    px[:, 0] = navigable_map.shape[0] - px[:, 0]
+    return px.astype(int)
 
 
 def px_to_xy(
@@ -67,10 +68,12 @@ def px_to_xy(
     Returns:
         World positions [N, 2] where each row is [x, y] in meters
     """
-    px_float = px.astype(float)
-    x = (px_float[:, 0] - episode_pixel_origin[1]) / pixels_per_meter
-    y = (px_float[:, 1] - episode_pixel_origin[0]) / pixels_per_meter
-    return np.column_stack([x, y])
+    px_copy = px.copy()
+    # Flip row coordinate back
+    px_copy[:, 0] = navigable_map.shape[0] - px_copy[:, 0]
+    # Translate, scale, and reverse [y,x] back to [x,y]
+    points = (px_copy - episode_pixel_origin) / pixels_per_meter
+    return points[:, ::-1]
 
 
 # ============================================================================
@@ -269,7 +272,7 @@ def is_line_clear(
     end_px = xy_to_px(end_world.reshape(1, 2), navigable_map, pixels_per_meter, episode_pixel_origin)[0]
 
     # Bresenham's line algorithm
-    # x traverses rows, y traverses cols for navigable_map[row, col] access
+    # start_px and end_px are in [col, row] format, so extract as x=row, y=col
     x0, y0 = start_px[1], start_px[0]
     x1, y1 = end_px[1], end_px[0]
 
@@ -278,6 +281,7 @@ def is_line_clear(
     x, y = x0, y0
     sx = 1 if x0 < x1 else -1
     sy = 1 if y0 < y1 else -1
+    # Check navigability along the line using map access pattern: map[x, y] where x=row, y=col
     if dx > dy:
         err = dx / 2.0
         while x != x1:
