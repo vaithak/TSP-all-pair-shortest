@@ -272,7 +272,7 @@ def is_line_clear(
     end_px = xy_to_px(end_world.reshape(1, 2), navigable_map, pixels_per_meter, episode_pixel_origin)[0]
 
     # Bresenham's line algorithm
-    # Extract x (horizontal/col) and y (vertical/row) for the algorithm
+    # start_px and end_px are in [col, row] format, so extract as x=row, y=col
     x0, y0 = start_px[1], start_px[0]
     x1, y1 = end_px[1], end_px[0]
 
