@@ -3,7 +3,7 @@
 /*                  This file is part of the program and library             */
 /*         SCIP --- Solving Constraint Integer Programs                      */
 /*                                                                           */
-/*  Copyright (c) 2002-2023 Zuse Institute Berlin (ZIB)                      */
+/*  Copyright (c) 2002-2024 Zuse Institute Berlin (ZIB)                      */
 /*                                                                           */
 /*  Licensed under the Apache License, Version 2.0 (the "License");          */
 /*  you may not use this file except in compliance with the License.         */
@@ -263,6 +263,38 @@ SCIP_EXPORT
 void SCIPgmlWriteClosing(
    FILE*                 file                /**< file to close */
    );
+
+/** writes the opening line to a dot graph file, does not open a file */
+SCIP_EXPORT
+void SCIPdotWriteOpening(
+   FILE*                 file                /**< file to write to */
+);
+
+/** adds a node to the dot graph */
+SCIP_EXPORT
+void SCIPdotWriteNode(
+   FILE*                 file,               /**< file to write to */
+   int                   node,               /**< node id */
+   const char*           label,              /**< node label */
+   const char*           nodetype,           /**< type of the node, or NULL */
+   const char*           fillcolor,          /**< color of the node's interior, or NULL */
+   const char*           bordercolor         /**< color of the node's border, or NULL */
+);
+
+/** adds an arc (edge) between two nodes in the dot graph */
+SCIP_EXPORT
+void SCIPdotWriteArc(
+   FILE*                 file,               /**< file to write to */
+   int                   source,             /**< source node id of the node */
+   int                   target,             /**< target node id of the edge */
+   const char*           color               /**< color of the edge, or NULL */
+);
+
+/** writes the closing line to a dot graph file, does not close a file */
+SCIP_EXPORT
+void SCIPdotWriteClosing(
+   FILE*                 file                /**< file to write to */
+);
 
 /**@} */
 
@@ -1876,13 +1908,13 @@ SCIP_Real SCIPselectSimpleValue(
  */
 SCIP_EXPORT
 SCIP_Real SCIPcalcRootNewton(
-   SCIP_DECL_NEWTONEVAL((*function)),       /**< pointer to function for which roots are computed */
+   SCIP_DECL_NEWTONEVAL((*function)),        /**< pointer to function for which roots are computed */
    SCIP_DECL_NEWTONEVAL((*derivative)),      /**< pointer to derivative of above function */
-   SCIP_Real*            params,            /**< parameters needed for function (can be NULL) */
-   int                   nparams,           /**< number of parameters (can be 0) */
-   SCIP_Real             x,                 /**< starting point */
-   SCIP_Real             eps,               /**< tolerance */
-   int                   k                  /**< iteration limit */
+   SCIP_Real*            params,             /**< parameters needed for function (can be NULL) */
+   int                   nparams,            /**< number of parameters (can be 0) */
+   SCIP_Real             x,                  /**< starting point */
+   SCIP_Real             eps,                /**< tolerance */
+   int                   k                   /**< iteration limit */
    );
 
 /* The C99 standard defines the function (or macro) isfinite.
@@ -2279,6 +2311,21 @@ int SCIPstrncpy(
    int                   size                /**< maximal size of t */
    );
 
+/** portable version of strcasecmp for case-insensitive comparison of two strings  */
+SCIP_EXPORT
+int SCIPstrcasecmp(
+   const char*           s1,                 /**< first string */
+   const char*           s2                  /**< second string */
+   );
+
+/** portable version of strncasecmp for case-insensitive comparison of two strings up to a given number of characters */
+SCIP_EXPORT
+int SCIPstrncasecmp(
+   const char*           s1,                 /**< first string */
+   const char*           s2,                 /**< second string */
+   int                   length              /**< maximal length to compare */
+   );
+
 /** extract the next token as a integer value if it is one; in case no value is parsed the endptr is set to @p str
  *
  *  @return Returns TRUE if a value could be extracted, otherwise FALSE
@@ -2317,9 +2364,9 @@ void SCIPstrCopySection(
 /** checks whether a given string t appears at the beginning of the string s (up to spaces at beginning) */
 SCIP_EXPORT
 SCIP_Bool SCIPstrAtStart(
-        const char*           s,                  /**< string to search in */
-        const char*           t,                  /**< string to search for */
-        size_t                tlen                /**< length of t */
+   const char*           s,                  /**< string to search in */
+   const char*           t,                  /**< string to search for */
+   size_t                tlen                /**< length of t */
 );
 
 /**@} */

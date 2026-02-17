@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -14,12 +14,12 @@
 #ifndef OR_TOOLS_SAT_ZERO_HALF_CUTS_H_
 #define OR_TOOLS_SAT_ZERO_HALF_CUTS_H_
 
-#include <functional>
 #include <utility>
 #include <vector>
 
+#include "absl/types/span.h"
 #include "ortools/lp_data/lp_types.h"
-#include "ortools/sat/integer.h"
+#include "ortools/sat/integer_base.h"
 #include "ortools/sat/util.h"
 
 namespace operations_research {
@@ -46,12 +46,11 @@ class ZeroHalfCutHelper {
   // TODO(user): This is a first implementation, both the heuristic and the
   // code performance can probably be improved uppon.
   void ProcessVariables(const std::vector<double>& lp_values,
-                        const std::vector<IntegerValue>& lower_bounds,
-                        const std::vector<IntegerValue>& upper_bounds);
-  void AddOneConstraint(
-      glop::RowIndex,
-      const std::vector<std::pair<glop::ColIndex, IntegerValue>>& terms,
-      IntegerValue lb, IntegerValue ub);
+                        absl::Span<const IntegerValue> lower_bounds,
+                        absl::Span<const IntegerValue> upper_bounds);
+  void AddOneConstraint(glop::RowIndex, absl::Span<const glop::ColIndex> cols,
+                        absl::Span<const IntegerValue> coeffs, IntegerValue lb,
+                        IntegerValue ub);
   std::vector<std::vector<std::pair<glop::RowIndex, IntegerValue>>>
   InterestingCandidates(ModelRandomGenerator* random);
 
@@ -92,7 +91,7 @@ class ZeroHalfCutHelper {
   // Like std::set_symmetric_difference, but use a vector<bool> instead of sort.
   // This assumes tmp_marked_ to be all false. We don't DCHECK it here for
   // speed, but it DCHECKed on each EliminateVarUsingRow() call.
-  void SymmetricDifference(const std::vector<int>& a, std::vector<int>* b);
+  void SymmetricDifference(absl::Span<const int> a, std::vector<int>* b);
 
  private:
   // As we combine rows, when the activity of a combination get too far away

@@ -3,7 +3,7 @@
 /*                  This file is part of the program and library             */
 /*         SCIP --- Solving Constraint Integer Programs                      */
 /*                                                                           */
-/*  Copyright (c) 2002-2023 Zuse Institute Berlin (ZIB)                      */
+/*  Copyright (c) 2002-2024 Zuse Institute Berlin (ZIB)                      */
 /*                                                                           */
 /*  Licensed under the Apache License, Version 2.0 (the "License");          */
 /*  you may not use this file except in compliance with the License.         */
@@ -157,14 +157,14 @@ struct SCIP_Node
    SCIP_NODE*            parent;             /**< parent node in the tree */
    SCIP_CONSSETCHG*      conssetchg;         /**< constraint set changes at this node or NULL */
    SCIP_DOMCHG*          domchg;             /**< domain changes at this node or NULL */
-   unsigned int          depth:16;           /**< depth in the tree */
-   unsigned int          nodetype:4;         /**< type of node */
+   unsigned int          depth:30;           /**< depth in the tree */
+   unsigned int          reoptid:32;         /**< unique id to identify the node during reoptimization */
+   unsigned int          reopttype:3;        /**< node type during reoptimization */
+   unsigned int          repropsubtreemark:9;/**< subtree repropagation marker for subtree repropagation */
    unsigned int          active:1;           /**< is node in the path to the current node? */
    unsigned int          cutoff:1;           /**< should the node and all sub nodes be cut off from the tree? */
    unsigned int          reprop:1;           /**< should propagation be applied again, if the node is on the active path? */
-   unsigned int          repropsubtreemark:9;/**< subtree repropagation marker for subtree repropagation */
-   unsigned int          reoptid:29;         /**< unique id to identify the node during reoptimization */
-   unsigned int          reopttype:3;        /**< node type during reoptimization */
+   unsigned int          nodetype:4;         /**< type of node */
 };
 
 /** bound change information for pending bound changes */

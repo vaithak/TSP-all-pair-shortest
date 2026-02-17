@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -14,7 +14,9 @@
 #ifndef OR_TOOLS_UTIL_RUNNING_STAT_H_
 #define OR_TOOLS_UTIL_RUNNING_STAT_H_
 
+#include <cstddef>
 #include <deque>
+#include <vector>
 
 #include "ortools/base/logging.h"
 
@@ -62,7 +64,7 @@ class RunningAverage {
   std::deque<int> values_;
 };
 
-// Simple class to compute efficiently the maximum over a fixed size window
+// Simple class to efficiently compute the maximum over a fixed size window
 // of a numeric stream. This works in constant average amortized time.
 template <class Number = double>
 class RunningMax {

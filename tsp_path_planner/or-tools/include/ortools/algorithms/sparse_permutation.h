@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -17,6 +17,7 @@
 #include <string>
 #include <vector>
 
+#include "absl/types/span.h"
 #include "ortools/base/logging.h"
 
 namespace operations_research {
@@ -58,6 +59,11 @@ class SparsePermutation {
   // information with the loop above. Not sure it is needed though.
   int LastElementInCycle(int i) const;
 
+  // Returns the image of the given element or `element` itself if it is stable
+  // under the permutation.
+  int Image(int element) const;
+  int InverseImage(int element) const;
+
   // To add a cycle to the permutation, repeatedly call AddToCurrentCycle()
   // with the cycle's orbit, then call CloseCurrentCycle();
   // This shouldn't be called on trivial cycles (of length 1).
@@ -66,7 +72,7 @@ class SparsePermutation {
 
   // Removes the cycles with given indices from the permutation. This
   // works in O(K) for a permutation displacing K elements.
-  void RemoveCycles(const std::vector<int>& cycle_indices);
+  void RemoveCycles(absl::Span<const int> cycle_indices);
 
   // Output all non-identity cycles of the permutation, sorted
   // lexicographically (each cycle is described starting by its smallest
@@ -74,6 +80,9 @@ class SparsePermutation {
   // This isn't efficient; use for debugging only.
   // Example: "(1 4 3) (5 9) (6 8 7)".
   std::string DebugString() const;
+
+  template <typename Collection>
+  void ApplyToDenseCollection(Collection& span) const;
 
  private:
   const int size_;
@@ -126,6 +135,24 @@ inline int SparsePermutation::LastElementInCycle(int i) const {
   DCHECK_LT(i, cycle_ends_.size());
   DCHECK_GT(cycle_ends_[i], i == 0 ? 0 : cycle_ends_[i - 1]);
   return cycles_[cycle_ends_[i] - 1];
+}
+
+template <typename Collection>
+void SparsePermutation::ApplyToDenseCollection(Collection& span) const {
+  using T = typename Collection::value_type;
+  for (int c = 0; c < NumCycles(); ++c) {
+    const int last_element_idx = LastElementInCycle(c);
+    int element = last_element_idx;
+    T last_element = span[element];
+    for (int image : Cycle(c)) {
+      if (image == last_element_idx) {
+        span[element] = last_element;
+      } else {
+        span[element] = span[image];
+      }
+      element = image;
+    }
+  }
 }
 
 }  // namespace operations_research

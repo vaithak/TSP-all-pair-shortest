@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -19,7 +19,6 @@
 #include <vector>
 
 #include "absl/types/span.h"
-#include "ortools/base/types.h"
 #include "ortools/sat/cp_model.pb.h"
 #include "ortools/sat/sat_parameters.pb.h"
 
@@ -66,6 +65,13 @@ bool SolutionIsFeasible(const CpModelProto& model,
                         absl::Span<const int64_t> variable_values,
                         const CpModelProto* mapping_proto = nullptr,
                         const std::vector<int>* postsolve_mapping = nullptr);
+
+// Checks a single constraint for feasibility.
+// This has some overhead, and should only be used for debugging.
+// The full model is needed for scheduling constraints that refers to intervals.
+bool ConstraintIsFeasible(const CpModelProto& model,
+                          const ConstraintProto& constraint,
+                          absl::Span<const int64_t> variable_values);
 
 }  // namespace sat
 }  // namespace operations_research

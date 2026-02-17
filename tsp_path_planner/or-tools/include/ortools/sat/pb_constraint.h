@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -27,9 +27,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "ortools/base/logging.h"
-#include "ortools/base/macros.h"
 #include "ortools/base/strong_vector.h"
-#include "ortools/base/types.h"
 #include "ortools/sat/model.h"
 #include "ortools/sat/sat_base.h"
 #include "ortools/sat/sat_parameters.pb.h"
@@ -104,7 +102,7 @@ bool ComputeBooleanLinearExpressionCanonicalForm(
 // Finally, this will return false if some integer overflow or underflow
 // occurred during the constraint simplification.
 bool ApplyLiteralMapping(
-    const absl::StrongVector<LiteralIndex, LiteralIndex>& mapping,
+    const util_intops::StrongVector<LiteralIndex, LiteralIndex>& mapping,
     std::vector<LiteralWithCoeff>* cst, Coefficient* bound_shift,
     Coefficient* max_value);
 
@@ -128,8 +126,7 @@ Coefficient ComputeNegatedCanonicalRhs(Coefficient lower_bound,
                                        Coefficient max_value);
 
 // Returns true iff the Boolean linear expression is in canonical form.
-bool BooleanLinearExpressionIsCanonical(
-    const std::vector<LiteralWithCoeff>& cst);
+bool BooleanLinearExpressionIsCanonical(absl::Span<const LiteralWithCoeff> cst);
 
 // Given a Boolean linear constraint in canonical form, simplify its
 // coefficients using simple heuristics.
@@ -153,6 +150,11 @@ class CanonicalBooleanLinearProblem {
  public:
   CanonicalBooleanLinearProblem() = default;
 
+  // This type is neither copyable nor movable.
+  CanonicalBooleanLinearProblem(const CanonicalBooleanLinearProblem&) = delete;
+  CanonicalBooleanLinearProblem& operator=(
+      const CanonicalBooleanLinearProblem&) = delete;
+
   // Adds a new constraint to the problem. The bounds are inclusive.
   // Returns false in case of a possible overflow or if the constraint is
   // never satisfiable.
@@ -170,12 +172,11 @@ class CanonicalBooleanLinearProblem {
   }
 
  private:
-  bool AddConstraint(const std::vector<LiteralWithCoeff>& cst,
+  bool AddConstraint(absl::Span<const LiteralWithCoeff> cst,
                      Coefficient max_value, Coefficient rhs);
 
   std::vector<Coefficient> rhs_;
   std::vector<std::vector<LiteralWithCoeff>> constraints_;
-  DISALLOW_COPY_AND_ASSIGN(CanonicalBooleanLinearProblem);
 };
 
 // Encode a constraint sum term <= rhs, where each term is a positive
@@ -329,7 +330,7 @@ class MutableUpperBoundedLinearConstraint {
   // The encoding is special:
   // - If terms_[x] > 0, then the associated term is 'terms_[x] . x'
   // - If terms_[x] < 0, then the associated term is 'terms_[x] . (x - 1)'
-  absl::StrongVector<BooleanVariable, Coefficient> terms_;
+  util_intops::StrongVector<BooleanVariable, Coefficient> terms_;
 
   // The right hand side of the constraint (sum terms <= rhs_).
   Coefficient rhs_;
@@ -388,7 +389,7 @@ class UpperBoundedLinearConstraint {
       const std::vector<LiteralWithCoeff>& cst);
 
   // Returns true if the given terms are the same as the one in this constraint.
-  bool HasIdenticalTerms(const std::vector<LiteralWithCoeff>& cst);
+  bool HasIdenticalTerms(absl::Span<const LiteralWithCoeff> cst);
   Coefficient Rhs() const { return rhs_; }
 
   // Sets the rhs of this constraint. Compute the initial threshold value using
@@ -537,6 +538,10 @@ class PbConstraints : public SatPropagator {
         num_threshold_updates_(0) {
     model->GetOrCreate<Trail>()->RegisterPropagator(this);
   }
+
+  // This type is neither copyable nor movable.
+  PbConstraints(const PbConstraints&) = delete;
+  PbConstraints& operator=(const PbConstraints&) = delete;
   ~PbConstraints() override {
     IF_STATS_ENABLED({
       LOG(INFO) << stats_.StatString();
@@ -547,8 +552,8 @@ class PbConstraints : public SatPropagator {
 
   bool Propagate(Trail* trail) final;
   void Untrail(const Trail& trail, int trail_index) final;
-  absl::Span<const Literal> Reason(const Trail& trail,
-                                   int trail_index) const final;
+  absl::Span<const Literal> Reason(const Trail& trail, int trail_index,
+                                   int64_t conflict_id) const final;
 
   // Changes the number of variables.
   void Resize(int num_variables) {
@@ -651,11 +656,11 @@ class PbConstraints : public SatPropagator {
   std::vector<std::unique_ptr<UpperBoundedLinearConstraint>> constraints_;
 
   // The current value of the threshold for each constraints.
-  absl::StrongVector<ConstraintIndex, Coefficient> thresholds_;
+  util_intops::StrongVector<ConstraintIndex, Coefficient> thresholds_;
 
   // For each literal, the list of all the constraints that contains it together
   // with the literal coefficient in these constraints.
-  absl::StrongVector<LiteralIndex, std::vector<ConstraintIndexWithCoeff>>
+  util_intops::StrongVector<LiteralIndex, std::vector<ConstraintIndexWithCoeff>>
       to_update_;
 
   // Bitset used to optimize the Untrail() function.
@@ -686,7 +691,6 @@ class PbConstraints : public SatPropagator {
   int64_t num_constraint_lookups_;
   int64_t num_inspected_constraint_literals_;
   int64_t num_threshold_updates_;
-  DISALLOW_COPY_AND_ASSIGN(PbConstraints);
 };
 
 // Boolean linear constraints can propagate a lot of literals at the same time.
@@ -700,6 +704,12 @@ class VariableWithSameReasonIdentifier {
  public:
   explicit VariableWithSameReasonIdentifier(const Trail& trail)
       : trail_(trail) {}
+
+  // This type is neither copyable nor movable.
+  VariableWithSameReasonIdentifier(const VariableWithSameReasonIdentifier&) =
+      delete;
+  VariableWithSameReasonIdentifier& operator=(
+      const VariableWithSameReasonIdentifier&) = delete;
 
   void Resize(int num_variables) {
     first_variable_.resize(num_variables);
@@ -725,10 +735,8 @@ class VariableWithSameReasonIdentifier {
 
  private:
   const Trail& trail_;
-  absl::StrongVector<BooleanVariable, BooleanVariable> first_variable_;
+  util_intops::StrongVector<BooleanVariable, BooleanVariable> first_variable_;
   SparseBitset<BooleanVariable> seen_;
-
-  DISALLOW_COPY_AND_ASSIGN(VariableWithSameReasonIdentifier);
 };
 
 }  // namespace sat

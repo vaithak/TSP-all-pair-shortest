@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -17,11 +17,12 @@
 #include <functional>
 #include <vector>
 
+#include "absl/types/span.h"
 #include "ortools/sat/clause.h"
-#include "ortools/sat/cp_model_mapping.h"
 #include "ortools/sat/integer.h"
-#include "ortools/sat/integer_search.h"
+#include "ortools/sat/integer_base.h"
 #include "ortools/sat/model.h"
+#include "ortools/sat/pb_constraint.h"
 #include "ortools/sat/sat_base.h"
 #include "ortools/sat/sat_parameters.pb.h"
 #include "ortools/sat/sat_solver.h"
@@ -92,8 +93,8 @@ void PresolveBooleanLinearExpression(std::vector<Literal>* literals,
 class CoreBasedOptimizer {
  public:
   CoreBasedOptimizer(IntegerVariable objective_var,
-                     const std::vector<IntegerVariable>& variables,
-                     const std::vector<IntegerValue>& coefficients,
+                     absl::Span<const IntegerVariable> variables,
+                     absl::Span<const IntegerValue> coefficients,
                      std::function<void()> feasible_solution_observer,
                      Model* model);
 
@@ -113,9 +114,9 @@ class CoreBasedOptimizer {
   // - Support resuming for interleaved search.
   // - Implement all core heurisitics.
   SatSolver::Status OptimizeWithSatEncoding(
-      const std::vector<Literal>& literals,
-      const std::vector<IntegerVariable>& vars,
-      const std::vector<Coefficient>& coefficients, Coefficient offset);
+      absl::Span<const Literal> literals,
+      absl::Span<const IntegerVariable> vars,
+      absl::Span<const Coefficient> coefficients, Coefficient offset);
 
  private:
   CoreBasedOptimizer(const CoreBasedOptimizer&) = delete;
@@ -167,6 +168,7 @@ class CoreBasedOptimizer {
 
   SatParameters* parameters_;
   SatSolver* sat_solver_;
+  ClauseManager* clauses_;
   TimeLimit* time_limit_;
   BinaryImplicationGraph* implications_;
   IntegerTrail* integer_trail_;

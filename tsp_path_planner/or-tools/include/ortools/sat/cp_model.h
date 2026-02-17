@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -48,11 +48,12 @@
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "ortools/sat/cp_model.pb.h"
-#include "ortools/sat/cp_model_solver.h"
+#include "ortools/sat/cp_model_solver.h"  // IWYU pragma: export.
 #include "ortools/sat/cp_model_utils.h"
-#include "ortools/sat/model.h"
+#include "ortools/sat/model.h"  // IWYU pragma: export.
 #include "ortools/sat/sat_parameters.pb.h"
 #include "ortools/util/sorted_interval_list.h"
 
@@ -81,7 +82,7 @@ class BoolVar {
 
   /// Sets the name of the variable.
   /// Note that this will always set the "positive" version of this Boolean.
-  BoolVar WithName(const std::string& name);
+  BoolVar WithName(absl::string_view name);
 
   /// Returns the name of the variable.
   std::string Name() const;
@@ -96,6 +97,8 @@ class BoolVar {
   bool operator!=(const BoolVar& other) const {
     return other.builder_ != builder_ || other.index_ != index_;
   }
+
+  BoolVar operator~() const { return Not(); }
 
   std::string DebugString() const;
 
@@ -163,7 +166,7 @@ class IntVar {
   BoolVar ToBoolVar() const;
 
   /// Sets the name of the variable.
-  IntVar WithName(const std::string& name);
+  IntVar WithName(absl::string_view name);
 
   /// Returns the name of the variable (or the empty string if not set).
   std::string Name() const;
@@ -451,7 +454,7 @@ class IntervalVar {
   IntervalVar();
 
   /// Sets the name of the variable.
-  IntervalVar WithName(const std::string& name);
+  IntervalVar WithName(absl::string_view name);
 
   /// Returns the name of the interval (or the empty string if not set).
   std::string Name() const;
@@ -550,10 +553,10 @@ class Constraint {
   Constraint OnlyEnforceIf(BoolVar literal);
 
   /// Sets the name of the constraint.
-  Constraint WithName(const std::string& name);
+  Constraint WithName(absl::string_view name);
 
   /// Returns the name of the constraint (or the empty string if not set).
-  const std::string& Name() const;
+  absl::string_view Name() const;
 
   /// Returns the underlying protobuf object (useful for testing).
   const ConstraintProto& Proto() const { return *proto_; }
@@ -730,7 +733,7 @@ class CumulativeConstraint : public Constraint {
 class CpModelBuilder {
  public:
   /// Sets the name of the model.
-  void SetName(const std::string& name);
+  void SetName(absl::string_view name);
 
   /// Creates an integer variable with the given domain.
   IntVar NewIntVar(const Domain& domain);
@@ -842,13 +845,23 @@ class CpModelBuilder {
   Constraint AddAllDifferent(std::initializer_list<LinearExpr> exprs);
 
   /// Adds the element constraint: variables[index] == target
-  Constraint AddVariableElement(IntVar index,
+  Constraint AddVariableElement(LinearExpr index,
                                 absl::Span<const IntVar> variables,
-                                IntVar target);
+                                LinearExpr target);
+
+  /// Adds the element constraint: expressions[index] == target.
+  Constraint AddElement(LinearExpr index,
+                        absl::Span<const LinearExpr> expressions,
+                        LinearExpr target);
+
+  /// Adds the element constraint: expressions[index] == target.
+  Constraint AddElement(LinearExpr index,
+                        std::initializer_list<LinearExpr> expressions,
+                        LinearExpr target);
 
   /// Adds the element constraint: values[index] == target
-  Constraint AddElement(IntVar index, absl::Span<const int64_t> values,
-                        IntVar target);
+  Constraint AddElement(LinearExpr index, absl::Span<const int64_t> values,
+                        LinearExpr target);
 
   /**
    * Adds a circuit constraint.
@@ -886,27 +899,51 @@ class CpModelBuilder {
   /**
    * Adds an allowed assignments constraint.
    *
-   * An AllowedAssignments constraint is a constraint on an array of variables
-   * that forces, when all variables are fixed to a single value, that the
-   * corresponding list of values is equal to one of the tuples added to the
-   * constraint.
+   * An AllowedAssignments constraint is a constraint on an array of affine
+   * expressions (a * var + b) that forces, when all expressions are fixed to a
+   * single value, that the corresponding list of values is equal to one of the
+   * tuples added to the constraint.
    *
    * It returns a table constraint that allows adding tuples incrementally after
    * construction.
    */
-  TableConstraint AddAllowedAssignments(absl::Span<const IntVar> vars);
+  TableConstraint AddAllowedAssignments(
+      absl::Span<const LinearExpr> expressions);
+
+  /**
+   * Adds an allowed assignments constraint.
+   */
+  TableConstraint AddAllowedAssignments(absl::Span<const IntVar> variables);
+
+  /**
+   * Adds an allowed assignments constraint.
+   */
+  TableConstraint AddAllowedAssignments(
+      std::initializer_list<LinearExpr> expressions);
 
   /**
    * Adds an forbidden assignments constraint.
    *
-   * A ForbiddenAssignments constraint is a constraint on an array of variables
-   * where the list of impossible combinations is provided in the tuples added
-   * to the constraint.
+   * A ForbiddenAssignments constraint is a constraint on an array of affine
+   * expressions (a * var + b) where the list of impossible combinations is
+   * provided in the tuples added to the constraint.
    *
    * It returns a table constraint that allows adding tuples incrementally after
    * construction.
    */
-  TableConstraint AddForbiddenAssignments(absl::Span<const IntVar> vars);
+  TableConstraint AddForbiddenAssignments(
+      absl::Span<const LinearExpr> expression);
+
+  /**
+   * Adds an forbidden assignments constraint.
+   */
+  TableConstraint AddForbiddenAssignments(absl::Span<const IntVar> variables);
+
+  /**
+   * Adds an forbidden assignments constraint.
+   */
+  TableConstraint AddForbiddenAssignments(
+      std::initializer_list<LinearExpr> expressions);
 
   /** An inverse constraint.
    *
@@ -965,8 +1002,22 @@ class CpModelBuilder {
    * incrementally after construction.
    */
   AutomatonConstraint AddAutomaton(
+      absl::Span<const LinearExpr> transition_expressions, int starting_state,
+      absl::Span<const int> final_states);
+
+  /**
+   * An automaton constraint.
+   */
+  AutomatonConstraint AddAutomaton(
       absl::Span<const IntVar> transition_variables, int starting_state,
       absl::Span<const int> final_states);
+
+  /**
+   * An automaton constraint.
+   */
+  AutomatonConstraint AddAutomaton(
+      std::initializer_list<LinearExpr> transition_expressions,
+      int starting_state, absl::Span<const int> final_states);
 
   /// Adds target == min(vars).
   Constraint AddMinEquality(const LinearExpr& target,
@@ -1066,9 +1117,21 @@ class CpModelBuilder {
       DecisionStrategyProto::VariableSelectionStrategy var_strategy,
       DecisionStrategyProto::DomainReductionStrategy domain_strategy);
 
-  /// Adds a decision strategy on a list of boolean variables.
+  /// Adds a decision strategy on a list of integer variables.
   void AddDecisionStrategy(
       absl::Span<const BoolVar> variables,
+      DecisionStrategyProto::VariableSelectionStrategy var_strategy,
+      DecisionStrategyProto::DomainReductionStrategy domain_strategy);
+
+  /// Adds a decision strategy on a list of affine expressions.
+  void AddDecisionStrategy(
+      absl::Span<const LinearExpr> expressions,
+      DecisionStrategyProto::VariableSelectionStrategy var_strategy,
+      DecisionStrategyProto::DomainReductionStrategy domain_strategy);
+
+  /// Adds a decision strategy on a list of affine expressions.
+  void AddDecisionStrategy(
+      std::initializer_list<LinearExpr> expressions,
       DecisionStrategyProto::VariableSelectionStrategy var_strategy,
       DecisionStrategyProto::DomainReductionStrategy domain_strategy);
 
@@ -1095,7 +1158,7 @@ class CpModelBuilder {
   CpModelProto* MutableProto() { return &cp_model_; }
 
   /// Export the model to file.
-  bool ExportToFile(const std::string& filename) const;
+  bool ExportToFile(absl::string_view filename) const;
 
   /// Returns a cloned version of the current model.
   CpModelBuilder Clone() const;

@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -121,8 +121,6 @@
 #ifndef OR_TOOLS_GRAPH_ONE_TREE_LOWER_BOUND_H_
 #define OR_TOOLS_GRAPH_ONE_TREE_LOWER_BOUND_H_
 
-#include <math.h>
-
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -130,8 +128,10 @@
 #include <utility>
 #include <vector>
 
-#include "ortools/base/types.h"
+#include "absl/types/span.h"
+#include "ortools/base/logging.h"
 #include "ortools/graph/christofides.h"
+#include "ortools/graph/graph.h"
 #include "ortools/graph/minimum_spanning_tree.h"
 
 namespace operations_research {
@@ -177,7 +177,7 @@ class VolgenantJonkerEvaluator {
   }
 
   void OnOneTree(CostType one_tree_cost, double w,
-                 const std::vector<int>& degrees) {
+                 absl::Span<const int> degrees) {
     if (!step1_initialized_) {
       step1_initialized_ = true;
       UpdateStep(one_tree_cost);
@@ -238,7 +238,7 @@ class HeldWolfeCrowderEvaluator {
   double GetStep() const { return step_; }
 
   void OnOneTree(CostType one_tree_cost, double w,
-                 const std::vector<int>& degrees) {
+                 absl::Span<const int> degrees) {
     double norm = 0;
     for (int degree : degrees) {
       const double delta = degree - 2;
@@ -334,10 +334,10 @@ int GetNodeMinimizingEdgeCostToSource(const GraphType& graph, int source,
 template <typename CostFunction, typename GraphType, typename CostType>
 std::vector<int> ComputeOneTree(const GraphType& graph,
                                 const CostFunction& cost,
-                                const std::vector<double>& weights,
-                                const std::vector<int>& sorted_arcs,
+                                absl::Span<const double> weights,
+                                absl::Span<const int> sorted_arcs,
                                 CostType* one_tree_cost) {
-  const auto weighed_cost = [&cost, &weights](int from, int to) {
+  const auto weighed_cost = [&cost, weights](int from, int to) {
     return cost(from, to) + weights[from] + weights[to];
   };
   // Compute MST on graph.

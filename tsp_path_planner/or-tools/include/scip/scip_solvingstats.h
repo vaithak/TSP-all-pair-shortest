@@ -3,7 +3,7 @@
 /*                  This file is part of the program and library             */
 /*         SCIP --- Solving Constraint Integer Programs                      */
 /*                                                                           */
-/*  Copyright (c) 2002-2023 Zuse Institute Berlin (ZIB)                      */
+/*  Copyright (c) 2002-2024 Zuse Institute Berlin (ZIB)                      */
 /*                                                                           */
 /*  Licensed under the Apache License, Version 2.0 (the "License");          */
 /*  you may not use this file except in compliance with the License.         */
@@ -103,8 +103,6 @@ int SCIPgetNReoptRuns(
    );
 
 /** add given number to the number of processed nodes in current run and in all runs, including the focus node
- *
- *  @return the number of processed nodes in current run, including the focus node
  *
  *  @pre This method can be called if SCIP is in one of the following stages:
  *       - \ref SCIP_STAGE_PROBLEM
@@ -1620,6 +1618,31 @@ SCIP_Real SCIPgetAvgCutoffScoreCurrentRun(
    SCIP*                 scip                /**< SCIP data structure */
    );
 
+/** returns the average normalized efficacy of a GMI cut over all variables
+ *
+ *  @return the average normalized efficacy of a GMI cut over all variables
+ *
+ *  @pre This method can be called if SCIP is in one of the following stages:
+ *       - \ref SCIP_STAGE_SOLVING
+ *       - \ref SCIP_STAGE_SOLVED
+ */
+SCIP_EXPORT
+SCIP_Real SCIPgetAvgGMIeff(
+   SCIP*                 scip                /**< SCIP data structure */
+   );
+
+/** increases the average normalized efficacy of a GMI cut over all variables
+ *
+ *  @pre This method can be called if SCIP is in one of the following stages:
+ *       - \ref SCIP_STAGE_SOLVING
+ *       - \ref SCIP_STAGE_SOLVED
+ */
+SCIP_EXPORT
+void SCIPincAvgGMIeff(
+   SCIP*                 scip,               /**< SCIP data structure */
+   SCIP_Real             gmieff              /**< average normalized GMI efficacy over all variables */
+   );
+
 /** gets deterministic time number of LPs solved so far
  *
  *  @return the total number of LPs solved so far
@@ -2214,6 +2237,12 @@ SCIP_RETCODE SCIPwriteImplicationConflictGraph(
 /** update statistical information when a new solution was found */
 SCIP_EXPORT
 void SCIPstoreSolutionGap(
+   SCIP*                 scip                /**< SCIP data structure */
+   );
+
+/** recomputes and returns the primal dual gap stored in the stats */
+SCIP_EXPORT
+SCIP_Real SCIPgetPrimalDualIntegral(
    SCIP*                 scip                /**< SCIP data structure */
    );
 

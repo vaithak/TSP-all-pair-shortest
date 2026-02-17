@@ -3,7 +3,7 @@
 /*                  This file is part of the program and library             */
 /*         SCIP --- Solving Constraint Integer Programs                      */
 /*                                                                           */
-/*  Copyright (c) 2002-2023 Zuse Institute Berlin (ZIB)                      */
+/*  Copyright (c) 2002-2024 Zuse Institute Berlin (ZIB)                      */
 /*                                                                           */
 /*  Licensed under the Apache License, Version 2.0 (the "License");          */
 /*  you may not use this file except in compliance with the License.         */
@@ -218,8 +218,8 @@ struct SCIP_Var
    SCIP_Real             primsolavg;         /**< weighted average of all values of variable in primal feasible solutions */
    SCIP_Real             conflictlb;         /**< maximal lower bound of variable in the current conflict */
    SCIP_Real             conflictub;         /**< minimal upper bound of variable in the current conflict */
-   SCIP_Real             conflictrelaxedlb;  /**< minimal relaxed lower bound of variable in the current conflict (conflictrelqxlb <= conflictlb) */
-   SCIP_Real             conflictrelaxedub;  /**< minimal release upper bound of variable in the current conflict (conflictrelqxlb <= conflictlb) */
+   SCIP_Real             conflictrelaxedlb;  /**< maximal relaxed lower bound of variable in the current conflict (conflictrelaxedlb <= conflictlb) */
+   SCIP_Real             conflictrelaxedub;  /**< minimal relaxed upper bound of variable in the current conflict (conflictrelaxedub >= conflictub) */
    SCIP_Real             lazylb;             /**< global lower bound that is ensured by constraints and has not to be added to the LP */
    SCIP_Real             lazyub;             /**< global upper bound that is ensured by constraints and has not to be added to the LP */
    SCIP_DOM              glbdom;             /**< domain of variable in global problem */

@@ -3,7 +3,7 @@
 /*                  This file is part of the program and library             */
 /*         SCIP --- Solving Constraint Integer Programs                      */
 /*                                                                           */
-/*  Copyright (c) 2002-2023 Zuse Institute Berlin (ZIB)                      */
+/*  Copyright (c) 2002-2024 Zuse Institute Berlin (ZIB)                      */
 /*                                                                           */
 /*  Licensed under the Apache License, Version 2.0 (the "License");          */
 /*  you may not use this file except in compliance with the License.         */
@@ -55,17 +55,21 @@ extern "C" {
  * @{
  */
 
-/** compares two constraint handlers w. r. to their separation priority */
+/** compares two constraint handlers w.r.t. their separation priority */
 SCIP_EXPORT
 SCIP_DECL_SORTPTRCOMP(SCIPconshdlrCompSepa);
 
-/** compares two constraint handlers w. r. to their enforcing priority */
+/** compares two constraint handlers w.r.t. their enforcing priority */
 SCIP_EXPORT
 SCIP_DECL_SORTPTRCOMP(SCIPconshdlrCompEnfo);
 
-/** compares two constraint handlers w. r. to their feasibility check priority */
+/** compares two constraint handlers w.r.t. their feasibility check priority */
 SCIP_EXPORT
 SCIP_DECL_SORTPTRCOMP(SCIPconshdlrCompCheck);
+
+/** compares two constraints w.r.t. their feasibility check priority */
+SCIP_EXPORT
+SCIP_DECL_SORTPTRCOMP(SCIPconsCompCheck);
 
 /** gets name of constraint handler */
 SCIP_EXPORT
@@ -125,7 +129,7 @@ void SCIPconshdlrSetEnforelax(
  *
  *  @note A constraint is active if it is global and was not removed or it was added locally (in that case the local
  *        flag is TRUE) and the current node belongs to the corresponding sub tree.
- */ 
+ */
 SCIP_EXPORT
 SCIP_CONS** SCIPconshdlrGetConss(
    SCIP_CONSHDLR*        conshdlr            /**< constraint handler */
@@ -174,7 +178,7 @@ int SCIPconshdlrGetNCheckConss(
  *
  *  @note A constraint is active if it is global and was not removed or it was added locally (in that case the local
  *        flag is TRUE) and the current node belongs to the corresponding sub tree.
- */ 
+ */
 SCIP_EXPORT
 int SCIPconshdlrGetNActiveConss(
    SCIP_CONSHDLR*        conshdlr            /**< constraint handler */
@@ -536,6 +540,18 @@ void SCIPconshdlrSetPresolTiming(
    SCIP_PRESOLTIMING     presoltiming        /** timing mask to be set */
    );
 
+/** returns whether conshdlr supports permutation symmetry detection */
+SCIP_EXPORT
+SCIP_Bool SCIPconshdlrSupportsPermsymDetection(
+   SCIP_CONSHDLR*        conshdlr            /**< constraint handler */
+   );
+
+/** returns whether conshdlr supports signed permutation symmetry detection */
+SCIP_EXPORT
+SCIP_Bool SCIPconshdlrSupportsSignedPermsymDetection(
+   SCIP_CONSHDLR*        conshdlr            /**< constraint handler */
+   );
+
 /** @} */
 
 /*
@@ -548,7 +564,7 @@ void SCIPconshdlrSetPresolTiming(
  */
 
 
-/** returns the name of the constraint 
+/** returns the name of the constraint
  *
  *  @note to change the name of a constraint, use SCIPchgConsName() from scip.h
  */

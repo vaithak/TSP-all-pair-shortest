@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -29,17 +29,22 @@
 #include <vector>
 
 #include "absl/container/flat_hash_set.h"
-#include "absl/time/time.h"
+#include "absl/types/span.h"
+#include "ortools/sat/clause.h"
 #include "ortools/sat/cp_model.pb.h"
+#include "ortools/sat/cp_model_mapping.h"
 #include "ortools/sat/implied_bounds.h"
 #include "ortools/sat/integer.h"
+#include "ortools/sat/integer_base.h"
 #include "ortools/sat/model.h"
 #include "ortools/sat/probing.h"
 #include "ortools/sat/pseudo_costs.h"
 #include "ortools/sat/sat_base.h"
+#include "ortools/sat/sat_inprocessing.h"
 #include "ortools/sat/sat_parameters.pb.h"
 #include "ortools/sat/sat_solver.h"
 #include "ortools/sat/synchronization.h"
+#include "ortools/sat/util.h"
 #include "ortools/util/strong_integers.h"
 #include "ortools/util/time_limit.h"
 
@@ -136,7 +141,9 @@ SatSolver::Status SolveIntegerProblemWithLazyEncoding(Model* model);
 IntegerLiteral AtMinValue(IntegerVariable var, IntegerTrail* integer_trail);
 
 // If a variable appear in the objective, branch on its best objective value.
-IntegerLiteral ChooseBestObjectiveValue(IntegerVariable var, Model* model);
+IntegerLiteral ChooseBestObjectiveValue(
+    IntegerVariable var, IntegerTrail* integer_trail,
+    ObjectiveDefinition* objective_definition);
 
 // Returns decision corresponding to var >= lb + max(1, (ub - lb) / 2). It also
 // CHECKs that the variable is not fixed.
@@ -167,7 +174,16 @@ IntegerLiteral SplitDomainUsingBestSolutionValue(IntegerVariable var,
 //
 // Note that this function will create the associated literal if needed.
 std::function<BooleanOrIntegerLiteral()> FirstUnassignedVarAtItsMinHeuristic(
-    const std::vector<IntegerVariable>& vars, Model* model);
+    absl::Span<const IntegerVariable> vars, Model* model);
+
+// Choose the variable with most fractional LP value.
+std::function<BooleanOrIntegerLiteral()> MostFractionalHeuristic(Model* model);
+
+// Variant used for LbTreeSearch experimentation. Note that each decision is in
+// O(num_variables), but it is kind of ok with LbTreeSearch as we only call this
+// for "new" decision, not when we move around in the tree.
+std::function<BooleanOrIntegerLiteral()> BoolPseudoCostHeuristic(Model* model);
+std::function<BooleanOrIntegerLiteral()> LpPseudoCostHeuristic(Model* model);
 
 // Decision heuristic for SolveIntegerProblemWithLazyEncoding(). Like
 // FirstUnassignedVarAtItsMinHeuristic() but the function will return the
@@ -175,7 +191,7 @@ std::function<BooleanOrIntegerLiteral()> FirstUnassignedVarAtItsMinHeuristic(
 // with the lowest min has a value <= this min.
 std::function<BooleanOrIntegerLiteral()>
 UnassignedVarWithLowestMinAtItsMinHeuristic(
-    const std::vector<IntegerVariable>& vars, Model* model);
+    absl::Span<const IntegerVariable> vars, Model* model);
 
 // Set the first unassigned Literal/Variable to its value.
 //
@@ -187,8 +203,8 @@ struct BooleanOrIntegerVariable {
   IntegerVariable int_var = kNoIntegerVariable;
 };
 std::function<BooleanOrIntegerLiteral()> FollowHint(
-    const std::vector<BooleanOrIntegerVariable>& vars,
-    const std::vector<IntegerValue>& values, Model* model);
+    absl::Span<const BooleanOrIntegerVariable> vars,
+    absl::Span<const IntegerValue> values, Model* model);
 
 // Combines search heuristics in order: if the i-th one returns kNoLiteralIndex,
 // ask the (i+1)-th. If every heuristic returned kNoLiteralIndex,
@@ -250,15 +266,9 @@ std::function<bool()> SatSolverRestartPolicy(Model* model);
 // Concatenates each input_heuristic with a default heuristic that instantiate
 // all the problem's Boolean variables, into a new vector.
 std::vector<std::function<BooleanOrIntegerLiteral()>> CompleteHeuristics(
-    const std::vector<std::function<BooleanOrIntegerLiteral()>>&
+    absl::Span<const std::function<BooleanOrIntegerLiteral()>>
         incomplete_heuristics,
     const std::function<BooleanOrIntegerLiteral()>& completion_heuristic);
-
-// Specialized search that will continuously probe Boolean variables and bounds
-// of integer variables.
-SatSolver::Status ContinuousProbing(
-    const std::vector<BooleanVariable>& bool_vars,
-    const std::vector<IntegerVariable>& int_vars, Model* model);
 
 // An helper class to share the code used by the different kind of search.
 class IntegerSearchHelper {
@@ -275,6 +285,10 @@ class IntegerSearchHelper {
   // Returns false if a conflict was found while trying to take a decision.
   bool GetDecision(const std::function<BooleanOrIntegerLiteral()>& f,
                    LiteralIndex* decision);
+
+  // Inner function used by GetDecision().
+  // It will create a new associated literal if needed.
+  LiteralIndex GetDecisionLiteral(const BooleanOrIntegerLiteral& decision);
 
   // Functions passed to GetDecision() might call this to notify a conflict
   // was detected.
@@ -309,7 +323,7 @@ class IntegerSearchHelper {
   ProductDetector* product_detector_;
   TimeLimit* time_limit_;
   PseudoCosts* pseudo_costs_;
-  IntegerVariable objective_var_ = kNoIntegerVariable;
+  Inprocessing* inprocessing_;
 
   bool must_process_conflict_ = false;
 };
@@ -331,10 +345,14 @@ class ContinuousProber {
   SatSolver::Status Probe();
 
  private:
-  bool ImportFromSharedClasses();
+  static const int kTestLimitPeriod = 20;
+  static const int kLogPeriod = 1000;
+  static const int kSyncPeriod = 50;
+
   SatSolver::Status ShaveLiteral(Literal literal);
   bool ReportStatus(SatSolver::Status status);
   void LogStatistics();
+  SatSolver::Status PeriodicSyncAndCheck();
 
   // Variables to probe.
   std::vector<BooleanVariable> bool_vars_;
@@ -344,28 +362,50 @@ class ContinuousProber {
   Model* model_;
   SatSolver* sat_solver_;
   TimeLimit* time_limit_;
+  BinaryImplicationGraph* binary_implication_graph_;
+  ClauseManager* clause_manager_;
   Trail* trail_;
   IntegerTrail* integer_trail_;
   IntegerEncoder* encoder_;
+  Inprocessing* inprocessing_;
   const SatParameters parameters_;
   LevelZeroCallbackHelper* level_zero_callbacks_;
   Prober* prober_;
   SharedResponseManager* shared_response_manager_;
   SharedBoundsManager* shared_bounds_manager_;
+  ModelRandomGenerator* random_;
 
   // Statistics.
   int64_t num_literals_probed_ = 0;
   int64_t num_bounds_shaved_ = 0;
   int64_t num_bounds_tried_ = 0;
+  int64_t num_at_least_one_probed_ = 0;
+  int64_t num_at_most_one_probed_ = 0;
+
+  // Period counters;
+  int num_logs_remaining_ = 0;
+  int num_syncs_remaining_ = 0;
+  int num_test_limit_remaining_ = 0;
+
+  // Shaving management.
+  bool use_shaving_ = false;
+  int trail_index_at_start_of_iteration_ = 0;
+  int integer_trail_index_at_start_of_iteration_ = 0;
 
   // Current state of the probe.
   double active_limit_;
   // TODO(user): use 2 vector<bool>.
   absl::flat_hash_set<BooleanVariable> probed_bool_vars_;
-  absl::flat_hash_set<LiteralIndex> probed_literals_;
+  absl::flat_hash_set<LiteralIndex> shaved_literals_;
   int iteration_ = 1;
   int current_int_var_ = 0;
   int current_bool_var_ = 0;
+  int current_bv1_ = 0;
+  int current_bv2_ = 0;
+  int random_pair_of_bool_vars_probed_ = 0;
+  int random_triplet_of_bool_vars_probed_ = 0;
+  std::vector<std::vector<Literal>> tmp_dnf_;
+  std::vector<Literal> tmp_literals_;
 };
 
 }  // namespace sat

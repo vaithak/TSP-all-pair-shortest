@@ -3,7 +3,7 @@
 /*                  This file is part of the program and library             */
 /*         SCIP --- Solving Constraint Integer Programs                      */
 /*                                                                           */
-/*  Copyright (c) 2002-2023 Zuse Institute Berlin (ZIB)                      */
+/*  Copyright (c) 2002-2024 Zuse Institute Berlin (ZIB)                      */
 /*                                                                           */
 /*  Licensed under the Apache License, Version 2.0 (the "License");          */
 /*  you may not use this file except in compliance with the License.         */
@@ -107,7 +107,7 @@ void SCIPconsGetDualsol(
    );
 
 /** returns the row of an arbitrary SCIP constraint that can be represented as a single linear constraint
- *  or NULL of no row is awailable
+ *  or NULL of no row is available
  */
 SCIP_EXPORT
 SCIP_ROW* SCIPconsGetRow(

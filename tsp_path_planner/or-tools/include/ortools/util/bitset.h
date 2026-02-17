@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -19,11 +19,15 @@
 #include <string.h>
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
 #include <string>
+#include <tuple>
 #include <vector>
 
+#include "absl/log/check.h"
 #include "ortools/base/logging.h"
-#include "ortools/base/types.h"
 
 namespace operations_research {
 
@@ -411,8 +415,9 @@ inline uint64_t TwoBitsFromPos64(uint64_t pos) {
 template <typename IndexType = int64_t>
 class Bitset64 {
  public:
-  // When speed matter, caching the base pointer like this to access this class
-  // in a read only mode help.
+  using value_type = IndexType;
+
+  // When speed matter, caching the base pointer helps.
   class ConstView {
    public:
     explicit ConstView(const Bitset64* bitset) : data_(bitset->data_.data()) {}
@@ -427,16 +432,33 @@ class Bitset64 {
     const uint64_t* const data_;
   };
 
+  class View {
+   public:
+    explicit View(Bitset64* bitset) : data_(bitset->data_.data()) {}
+
+    bool operator[](IndexType i) const {
+      return data_[BitOffset64(Value(i))] & OneBit64(BitPos64(Value(i)));
+    }
+
+    void Clear(IndexType i) {
+      data_[BitOffset64(Value(i))] &= ~OneBit64(BitPos64(Value(i)));
+    }
+
+    void Set(IndexType i) {
+      data_[BitOffset64(Value(i))] |= OneBit64(BitPos64(Value(i)));
+    }
+
+   private:
+    uint64_t* const data_;
+  };
+
   Bitset64() : size_(), data_() {}
   explicit Bitset64(IndexType size)
       : size_(Value(size) > 0 ? size : IndexType(0)),
         data_(BitLength64(Value(size_))) {}
 
-  // This type is neither copyable nor movable.
-  Bitset64(const Bitset64&) = delete;
-  Bitset64& operator=(const Bitset64&) = delete;
-
   ConstView const_view() const { return ConstView(this); }
+  View view() { return View(this); }
 
   // Returns how many bits this Bitset64 can hold.
   IndexType size() const { return size_; }
@@ -452,7 +474,14 @@ class Bitset64 {
   void resize(int size) { Resize(IndexType(size)); }
   void Resize(IndexType size) {
     DCHECK_GE(Value(size), 0);
-    size_ = Value(size) > 0 ? size : IndexType(0);
+    IndexType new_size = Value(size) > 0 ? size : IndexType(0);
+    if (new_size < size_ && Value(new_size) > 0) {
+      const int64_t new_data_size = BitLength64(Value(new_size));
+      const uint64_t bitmask = kAllBitsButLsb64
+                               << BitPos64(Value(new_size) - 1);
+      data_[new_data_size - 1] &= ~bitmask;
+    }
+    size_ = new_size;
     data_.resize(BitLength64(Value(size_)), 0);
   }
 
@@ -477,14 +506,14 @@ class Bitset64 {
   void Clear(IndexType i) {
     DCHECK_GE(Value(i), 0);
     DCHECK_LT(Value(i), Value(size_));
-    data_[BitOffset64(Value(i))] &= ~OneBit64(BitPos64(Value(i)));
+    data_.data()[BitOffset64(Value(i))] &= ~OneBit64(BitPos64(Value(i)));
   }
 
   // Sets bucket containing bit i to 0.
   void ClearBucket(IndexType i) {
     DCHECK_GE(Value(i), 0);
     DCHECK_LT(Value(i), Value(size_));
-    data_[BitOffset64(Value(i))] = 0;
+    data_.data()[BitOffset64(Value(i))] = 0;
   }
 
   // Clears the bits at position i and i ^ 1.
@@ -498,14 +527,14 @@ class Bitset64 {
   bool AreOneOfTwoBitsSet(IndexType i) const {
     DCHECK_GE(Value(i), 0);
     DCHECK_LT(Value(i), Value(size_));
-    return data_[BitOffset64(Value(i))] & TwoBitsFromPos64(Value(i));
+    return data_.data()[BitOffset64(Value(i))] & TwoBitsFromPos64(Value(i));
   }
 
   // Returns true if the bit at position i is set.
   bool IsSet(IndexType i) const {
     DCHECK_GE(Value(i), 0);
     DCHECK_LT(Value(i), Value(size_));
-    return data_[BitOffset64(Value(i))] & OneBit64(BitPos64(Value(i)));
+    return data_.data()[BitOffset64(Value(i))] & OneBit64(BitPos64(Value(i)));
   }
 
   // Same as IsSet().
@@ -515,7 +544,8 @@ class Bitset64 {
   void Set(IndexType i) {
     DCHECK_GE(Value(i), 0);
     DCHECK_LT(Value(i), size_);
-    data_[BitOffset64(Value(i))] |= OneBit64(BitPos64(Value(i)));
+    // The c++ hardening is costly here, so we disable it.
+    data_.data()[BitOffset64(Value(i))] |= OneBit64(BitPos64(Value(i)));
   }
 
   // If value is true, sets the bit at position i to 1, sets it to 0 otherwise.
@@ -562,11 +592,26 @@ class Bitset64 {
   // the higher order bits are assumed to be 0.
   void Intersection(const Bitset64<IndexType>& other) {
     const int min_size = std::min(data_.size(), other.data_.size());
+    uint64_t* const d = data_.data();
+    const uint64_t* const o = other.data_.data();
     for (int i = 0; i < min_size; ++i) {
-      data_[i] &= other.data_[i];
+      d[i] &= o[i];
     }
     for (int i = min_size; i < data_.size(); ++i) {
-      data_[i] = 0;
+      d[i] = 0;
+    }
+  }
+
+  // This one assume both given bitset to be of the same size.
+  void SetToIntersectionOf(const Bitset64<IndexType>& a,
+                           const Bitset64<IndexType>& b) {
+    DCHECK_EQ(a.size(), b.size());
+    Resize(a.size());
+
+    // Copy buckets.
+    const int num_buckets = a.data_.size();
+    for (int i = 0; i < num_buckets; ++i) {
+      data_[i] = a.data_[i] & b.data_[i];
     }
   }
 
@@ -584,9 +629,21 @@ class Bitset64 {
   //
   // IMPORTANT: Because the iterator "caches" the current uint64_t bucket, this
   // will probably not do what you want if Bitset64 is modified while iterating.
-  class EndIterator {};
   class Iterator {
    public:
+    // Make this iterator a std::forward_iterator, so it works with std::sample,
+    // std::max_element, etc.
+    Iterator() : data_(nullptr), size_(0) {}
+    Iterator(Iterator&& other) = default;
+    Iterator(const Iterator& other) = default;
+    Iterator& operator=(const Iterator& other) = default;
+    using difference_type = std::ptrdiff_t;
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = IndexType;
+    using size_type = std::size_t;
+    using reference = value_type&;
+    using pointer = value_type*;
+
     explicit Iterator(const Bitset64& bitset)
         : data_(bitset.data_.data()), size_(bitset.data_.size()) {
       if (!bitset.data_.empty()) {
@@ -595,17 +652,34 @@ class Bitset64 {
       }
     }
 
-    bool operator!=(const EndIterator&) const { return size_ != 0; }
+    static Iterator EndIterator(const Bitset64& bitset) {
+      return Iterator(bitset.data_.data());
+    }
+
+    bool operator==(const Iterator& other) const { return !(*this != other); }
+    bool operator!=(const Iterator& other) const {
+      if (other.size_ == 0) {
+        return size_ != 0;
+      }
+      return std::tie(index_, current_) !=
+             std::tie(other.index_, other.current_);
+    }
 
     IndexType operator*() const { return IndexType(index_); }
 
-    void operator++() {
+    Iterator operator++(int) {
+      Iterator other = *this;
+      ++(*this);
+      return other;
+    }
+
+    Iterator& operator++() {
       int bucket = BitOffset64(index_);
       while (current_ == 0) {
         bucket++;
         if (bucket == size_) {
           size_ = 0;
-          return;
+          return *this;
         }
         current_ = data_[bucket];
       }
@@ -613,10 +687,13 @@ class Bitset64 {
       // Computes the index and clear the least significant bit of current_.
       index_ = BitShift64(bucket) | LeastSignificantBitPosition64(current_);
       current_ &= current_ - 1;
+      return *this;
     }
 
    private:
-    const uint64_t* const data_;
+    explicit Iterator(const uint64_t* data) : data_(data), size_(0) {}
+
+    const uint64_t* data_;
     int size_;
     int index_ = 0;
     uint64_t current_ = 0;
@@ -625,7 +702,7 @@ class Bitset64 {
   // Allows range-based "for" loop on the non-zero positions:
   //   for (const IndexType index : bitset) {}
   Iterator begin() const { return Iterator(*this); }
-  EndIterator end() const { return EndIterator(); }
+  Iterator end() const { return Iterator::EndIterator(*this); }
 
   // Cryptic function! This is just an optimized version of a given piece of
   // code and has probably little general use.
@@ -648,6 +725,11 @@ class Bitset64 {
       output += IsSet(i) ? "1" : "0";
     }
     return output;
+  }
+
+  bool IsAllFalse() const {
+    return std::all_of(data_.begin(), data_.end(),
+                       [](uint64_t v) { return v == 0; });
   }
 
  private:
@@ -750,6 +832,10 @@ inline int Bitset64<int64_t>::Value(int64_t input) {
   DCHECK_GE(input, 0);
   return input;
 }
+template <>
+inline int Bitset64<size_t>::Value(size_t input) {
+  return input;
+}
 
 // A simple utility class to set/unset integer in a range [0, size).
 // This is optimized for sparsity.
@@ -802,10 +888,14 @@ class SparseBitset {
       to_clear_.push_back(index);
     }
   }
-  void SetUnsafe(IntegerType index) {
-    bitset_.Set(index);
+
+  // A bit hacky for really hot loop.
+  typename Bitset64<IntegerType>::View BitsetView() { return bitset_.view(); }
+  void SetUnsafe(typename Bitset64<IntegerType>::View view, IntegerType index) {
+    view.Set(index);
     to_clear_.push_back(index);
   }
+
   void Clear(IntegerType index) { bitset_.Clear(index); }
   int NumberOfSetCallsWithDifferentArguments() const {
     return to_clear_.size();

@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -154,7 +154,6 @@
 #include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_format.h"
-#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
@@ -164,10 +163,11 @@
 #include "ortools/linear_solver/linear_solver.pb.h"
 #include "ortools/linear_solver/linear_solver_callback.h"
 #include "ortools/port/proto_utils.h"
+#include "ortools/util/lazy_mutable_copy.h"
 
-ABSL_DECLARE_FLAG(bool, linear_solver_enable_verbose_output);
-ABSL_DECLARE_FLAG(bool, log_verification_errors);
-ABSL_DECLARE_FLAG(bool, verify_solution);
+OR_DLL ABSL_DECLARE_FLAG(bool, linear_solver_enable_verbose_output);
+OR_DLL ABSL_DECLARE_FLAG(bool, log_verification_errors);
+OR_DLL ABSL_DECLARE_FLAG(bool, verify_solution);
 
 namespace operations_research {
 
@@ -572,18 +572,36 @@ class MPSolver {
    * other solver type immediately returns an MPSOLVER_INCOMPATIBLE_OPTIONS
    * error.
    *
+   * `interrupt` is non-const because the internal solver may set it to true
+   * itself, in some cases.
+   *
    * Note(user): This attempts to first use `DirectlySolveProto()` (if
    * implemented). Consequently, this most likely does *not* override any of
    * the default parameters of the underlying solver. This behavior *differs*
    * from `MPSolver::Solve()` which by default sets the feasibility tolerance
    * and the gap limit (as of 2020/02/11, to 1e-7 and 0.0001, respectively).
    */
+  ABSL_DEPRECATED("Prefer SolveMPModel() from solve_mp_model.h.")
   static void SolveWithProto(const MPModelRequest& model_request,
                              MPSolutionResponse* response,
-                             // `interrupt` is non-const because the internal
-                             // solver may set it to true itself, in some cases.
                              std::atomic<bool>* interrupt = nullptr);
 
+  /**
+   * This version support both `const MPModelRequest&` and `MPModelRequest&&`
+   * for the request. When using the second form, it will try to delete the
+   * request as soon as it is translated to the solver internal representation.
+   * This saves peak memory usage.
+   *
+   * Note that we need a different name and can't just accept MPModelRequest&&
+   * otherwise we have swig issues.
+   */
+  ABSL_DEPRECATED("Prefer SolveMPModel() from solve_mp_model.h.")
+  static void SolveLazyMutableRequest(LazyMutableCopy<MPModelRequest> request,
+                                      MPSolutionResponse* response,
+                                      std::atomic<bool>* interrupt = nullptr);
+
+  ABSL_DEPRECATED(
+      "Prefer SolverTypeSupportsInterruption() from solve_mp_model.h.")
   static bool SolverTypeSupportsInterruption(
       const MPModelRequest::SolverType solver) {
     // Interruption requires that MPSolver::InterruptSolve is supported for the
@@ -697,6 +715,7 @@ class MPSolver {
 
   // Gives some brief (a few lines, at most) human-readable information about
   // the given request, suitable for debug logging.
+  ABSL_DEPRECATED("Prefer MPModelRequestLoggingInfo() from solve_mp_model.h.")
   static std::string GetMPModelRequestLoggingInfo(
       const MPModelRequest& request);
 
@@ -1450,7 +1469,7 @@ class MPConstraint {
  * instead. We need to figure out how to deal with the subtleties of
  * the default values.
  */
-class MPSolverParameters {
+class OR_DLL MPSolverParameters {
  public:
   /// Enumeration of parameters that take continuous values.
   enum DoubleParam {
@@ -1642,22 +1661,27 @@ class MPSolverInterface {
   // solution is optimal.
   virtual MPSolver::ResultStatus Solve(const MPSolverParameters& param) = 0;
 
-  // Attempts to directly solve a MPModelRequest, bypassing the MPSolver data
+  // DirectlySolveProto() shall only be used if SupportsDirectlySolveProto() is
+  // true.
+  //
+  // DirectlySolveProto() solves a MPModelRequest, bypassing the MPSolver data
   // structures entirely. Like MPSolver::SolveWithProto(), optionally takes in
   // an 'interrupt' boolean.
-  // Returns {} (eg. absl::nullopt) if direct-solve is not supported by the
-  // underlying solver (possibly because interrupt != nullptr), in which case
-  // the user should fall back to using MPSolver.
-  virtual std::optional<MPSolutionResponse> DirectlySolveProto(
-      const MPModelRequest& /*request*/,
+  virtual bool SupportsDirectlySolveProto(
+      std::atomic<bool>* /*interrupt*/) const {
+    return false;
+  }
+  virtual MPSolutionResponse DirectlySolveProto(
+      LazyMutableCopy<MPModelRequest> /*request*/,
       // `interrupt` is non-const because the internal
       // solver may set it to true itself, in some cases.
       std::atomic<bool>* /*interrupt*/) {
-    return std::nullopt;
+    LOG(DFATAL) << "Default implementation should never be called.";
+    return MPSolutionResponse();
   }
 
   // Writes the model using the solver internal write function.  Currently only
-  // available for GurobiInterface.
+  // available for GurobiInterface and XpressInterface.
   virtual void Write(const std::string& filename);
 
   // ----- Model modifications and extraction -----

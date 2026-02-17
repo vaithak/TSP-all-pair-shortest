@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -40,6 +40,7 @@
 #include "absl/random/bit_gen_ref.h"
 #include "absl/random/random.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "ortools/base/macros.h"
 #include "ortools/base/strong_vector.h"
 #include "ortools/bop/bop_base.h"
@@ -249,7 +250,7 @@ class NonOrderedSetHasher {
 
  private:
   absl::BitGenRef random_;
-  absl::StrongVector<IntType, uint64_t> hashes_;
+  util_intops::StrongVector<IntType, uint64_t> hashes_;
 };
 
 // This class is used to incrementally maintain an assignment and the
@@ -308,7 +309,7 @@ class AssignmentAndConstraintFeasibilityMaintainer {
   // Note that the assignment of those literals can be reverted thanks to
   // AddBacktrackingLevel() and BacktrackOneLevel().
   // Note that a variable can't be assigned twice, even for the same literal.
-  void Assign(const std::vector<sat::Literal>& literals);
+  void Assign(absl::Span<const sat::Literal> literals);
 
   // Adds a new backtracking level to specify the state that will be restored
   // by BacktrackOneLevel().
@@ -412,16 +413,16 @@ class AssignmentAndConstraintFeasibilityMaintainer {
     int64_t weight;
   };
 
-  absl::StrongVector<VariableIndex,
-                     absl::StrongVector<EntryIndex, ConstraintEntry>>
+  util_intops::StrongVector<
+      VariableIndex, util_intops::StrongVector<EntryIndex, ConstraintEntry>>
       by_variable_matrix_;
-  absl::StrongVector<ConstraintIndex, int64_t> constraint_lower_bounds_;
-  absl::StrongVector<ConstraintIndex, int64_t> constraint_upper_bounds_;
+  util_intops::StrongVector<ConstraintIndex, int64_t> constraint_lower_bounds_;
+  util_intops::StrongVector<ConstraintIndex, int64_t> constraint_upper_bounds_;
 
   BopSolution assignment_;
   BopSolution reference_;
 
-  absl::StrongVector<ConstraintIndex, int64_t> constraint_values_;
+  util_intops::StrongVector<ConstraintIndex, int64_t> constraint_values_;
   BacktrackableIntegerSet<ConstraintIndex> infeasible_constraint_set_;
 
   // This contains the list of variable flipped in assignment_.
@@ -513,8 +514,8 @@ class OneFlipConstraintRepairer {
   // on most promising variables first.
   void SortTermsOfEachConstraints(int num_variables);
 
-  absl::StrongVector<ConstraintIndex,
-                     absl::StrongVector<TermIndex, ConstraintTerm>>
+  util_intops::StrongVector<
+      ConstraintIndex, util_intops::StrongVector<TermIndex, ConstraintTerm>>
       by_constraint_matrix_;
   const AssignmentAndConstraintFeasibilityMaintainer& maintainer_;
   const sat::VariablesAssignment& sat_assignment_;
@@ -631,7 +632,7 @@ class LocalSearchAssignmentIterator {
   SatWrapper* const sat_wrapper_;
   OneFlipConstraintRepairer repairer_;
   std::vector<SearchNode> search_nodes_;
-  absl::StrongVector<ConstraintIndex, TermIndex> initial_term_index_;
+  util_intops::StrongVector<ConstraintIndex, TermIndex> initial_term_index_;
 
   // Temporary vector used by ApplyDecision().
   std::vector<sat::Literal> tmp_propagated_literals_;

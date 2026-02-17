@@ -3,7 +3,7 @@
 /*                  This file is part of the program and library             */
 /*         SCIP --- Solving Constraint Integer Programs                      */
 /*                                                                           */
-/*  Copyright (c) 2002-2023 Zuse Institute Berlin (ZIB)                      */
+/*  Copyright (c) 2002-2024 Zuse Institute Berlin (ZIB)                      */
 /*                                                                           */
 /*  Licensed under the Apache License, Version 2.0 (the "License");          */
 /*  you may not use this file except in compliance with the License.         */
@@ -49,6 +49,7 @@
 #include "scip/type_prob.h"
 #include "scip/type_sol.h"
 #include "scip/type_branch.h"
+#include "scip/type_message.h"
 #include "scip/pub_lp.h"
 
 #include "scip/struct_lp.h"
@@ -56,6 +57,45 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+
+/*
+ * double linked coefficient matrix methods
+ */
+
+/** insert column coefficients in corresponding rows */
+SCIP_RETCODE colLink(
+   SCIP_COL*             col,                /**< column data */
+   BMS_BLKMEM*           blkmem,             /**< block memory */
+   SCIP_SET*             set,                /**< global SCIP settings */
+   SCIP_EVENTQUEUE*      eventqueue,         /**< event queue */
+   SCIP_LP*              lp                  /**< current LP data */
+   );
+
+/** removes column coefficients from corresponding rows */
+SCIP_RETCODE colUnlink(
+   SCIP_COL*             col,                /**< column data */
+   BMS_BLKMEM*           blkmem,             /**< block memory */
+   SCIP_SET*             set,                /**< global SCIP settings */
+   SCIP_EVENTQUEUE*      eventqueue,         /**< event queue */
+   SCIP_LP*              lp                  /**< current LP data */
+   );
+
+/** insert row coefficients in corresponding columns */
+SCIP_RETCODE rowLink(
+   SCIP_ROW*             row,                /**< row data */
+   BMS_BLKMEM*           blkmem,             /**< block memory */
+   SCIP_SET*             set,                /**< global SCIP settings */
+   SCIP_EVENTQUEUE*      eventqueue,         /**< event queue */
+   SCIP_LP*              lp                  /**< current LP data */
+   );
+
+/** removes row coefficients from corresponding columns */
+SCIP_RETCODE rowUnlink(
+   SCIP_ROW*             row,                /**< row data */
+   SCIP_SET*             set,                /**< global SCIP settings */
+   SCIP_LP*              lp                  /**< current LP data */
+   );
 
 /*
  * Column methods
@@ -1610,7 +1650,7 @@ SCIP_Bool SCIPlpIsFeasNegative(
 #define SCIPlpGetNNewcols(lp)           ((lp)->ncols - (lp)->firstnewcol)
 #define SCIPlpGetNewrows(lp)            (&((lp)->rows[(lp)->firstnewrow]))
 #define SCIPlpGetNNewrows(lp)           ((lp)->nrows - (lp)->firstnewrow)
-#define SCIPlpGetObjNorm(lp)            (SQRT((lp)->objsqrnorm))
+#define SCIPlpGetObjNorm(lp)            (sqrt((lp)->objsqrnorm))
 #define SCIPlpGetRootObjval(lp)         (MIN((lp)->rootlpobjval + (lp)->rootlooseobjval, SCIP_INVALID))
 #define SCIPlpGetRootColumnObjval(lp)   ((lp)->rootlpobjval)
 #define SCIPlpGetRootLooseObjval(lp)    ((lp)->rootlooseobjval)

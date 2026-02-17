@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -18,6 +18,7 @@
 
 #include "absl/status/statusor.h"
 #include "ortools/linear_solver/linear_solver.pb.h"
+#include "ortools/util/lazy_mutable_copy.h"
 #include "scip/type_scip.h"
 
 namespace operations_research {
@@ -27,7 +28,7 @@ namespace operations_research {
 // 1e-7, and the gap limit to 0.0001 (whereas SCIP defaults are 1e-6 and 0,
 // respectively, and they are being used here).
 absl::StatusOr<MPSolutionResponse> ScipSolveProto(
-    const MPModelRequest& request);
+    LazyMutableCopy<MPModelRequest> request);
 
 std::string FindErrorInMPModelForScip(const MPModelProto& model, SCIP* scip);
 

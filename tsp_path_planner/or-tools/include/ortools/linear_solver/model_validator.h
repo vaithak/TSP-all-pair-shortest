@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -59,12 +59,12 @@ ExtractValidMPModelOrPopulateResponseStatus(const MPModelRequest& request,
                                             MPSolutionResponse* response);
 
 /**
- * Like ExtractValidMPModelOrPopulateResponseStatus(), but works in-place:
- * if the MPModel needed extraction, it will be populated in the request, and
- * it returns the success boolean.
+ * Same as ExtractValidMPModelOrPopulateResponseStatus() but if we already
+ * have ownership of the request, do not do any copy even when needed.
+ * Note that the MPModelProto in the request will be cleared in this case.
  */
-bool ExtractValidMPModelInPlaceOrPopulateResponseStatus(
-    MPModelRequest* request, MPSolutionResponse* response);
+std::optional<LazyMutableCopy<MPModelProto>> GetMPModelOrPopulateResponse(
+    LazyMutableCopy<MPModelRequest>& request, MPSolutionResponse* response);
 
 /**
  * Returns an empty string if the solution hint given in the model is a feasible

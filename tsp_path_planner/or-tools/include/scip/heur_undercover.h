@@ -3,7 +3,7 @@
 /*                  This file is part of the program and library             */
 /*         SCIP --- Solving Constraint Integer Programs                      */
 /*                                                                           */
-/*  Copyright (c) 2002-2023 Zuse Institute Berlin (ZIB)                      */
+/*  Copyright (c) 2002-2024 Zuse Institute Berlin (ZIB)                      */
 /*                                                                           */
 /*  Licensed under the Apache License, Version 2.0 (the "License");          */
 /*  you may not use this file except in compliance with the License.         */
@@ -74,7 +74,10 @@ SCIP_RETCODE SCIPcomputeCoverUndercover(
    SCIP_Real             objlimit,           /**< objective limit: upper bound on coversize */
    SCIP_Bool             globalbounds,       /**< should global bounds on variables be used instead of local bounds at focus node? */
    SCIP_Bool             onlyconvexify,      /**< should we only fix/dom.red. variables creating nonconvexity? */
+   SCIP_Bool             coverand,           /**< should and constraints be covered (or just copied)? */
    SCIP_Bool             coverbd,            /**< should bounddisjunction constraints be covered (or just copied)? */
+   SCIP_Bool             coverind,           /**< should indicator constraints be covered (or just copied)? */
+   SCIP_Bool             covernl,            /**< should nonlinear constraints be covered (or just copied)? */
    char                  coveringobj,        /**< objective function of the covering problem ('b'ranching status,
                                               *   influenced nonlinear 'c'onstraints/'t'erms, 'd'omain size, 'l'ocks,
                                               *   'm'in of up/down locks, 'u'nit penalties, constraint 'v'iolation) */

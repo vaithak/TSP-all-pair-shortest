@@ -12,14 +12,15 @@
 #ifndef GOOGLE_PROTOBUF_COMPILER_CPP_MESSAGE_H__
 #define GOOGLE_PROTOBUF_COMPILER_CPP_MESSAGE_H__
 
+#include <cstddef>
 #include <cstdint>
-#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/strings/string_view.h"
 #include "google/protobuf/compiler/cpp/enum.h"
 #include "google/protobuf/compiler/cpp/extension.h"
 #include "google/protobuf/compiler/cpp/field.h"
@@ -27,6 +28,7 @@
 #include "google/protobuf/compiler/cpp/message_layout_helper.h"
 #include "google/protobuf/compiler/cpp/options.h"
 #include "google/protobuf/compiler/cpp/parse_function_generator.h"
+#include "google/protobuf/descriptor.h"
 #include "google/protobuf/io/printer.h"
 
 namespace google {
@@ -45,6 +47,8 @@ class MessageGenerator {
   MessageGenerator& operator=(const MessageGenerator&) = delete;
 
   ~MessageGenerator() = default;
+
+  int index_in_file_messages() const { return index_in_file_messages_; }
 
   // Append the two types of nested generators to the corresponding vector.
   void AddGenerators(
@@ -80,6 +84,7 @@ class MessageGenerator {
   const Descriptor* descriptor() const { return descriptor_; }
 
  private:
+  using GeneratorFunction = FieldGeneratorBase::GeneratorFunction;
   enum class InitType { kConstexpr, kArena, kArenaCopy };
 
   // Generate declarations and definitions of accessors for fields.
@@ -89,14 +94,12 @@ class MessageGenerator {
   // Generate constructors and destructor.
   void GenerateStructors(io::Printer* p);
 
-#ifdef PROTOBUF_EXPLICIT_CONSTRUCTORS
   void GenerateZeroInitFields(io::Printer* p) const;
   void GenerateCopyInitFields(io::Printer* p) const;
 
   void GenerateImplMemberInit(io::Printer* p, InitType init_type);
 
   void GenerateArenaEnabledCopyConstructor(io::Printer* p);
-#endif  // PROTOBUF_EXPLICIT_CONSTRUCTORS
 
   // The compiler typically generates multiple copies of each constructor and
   // destructor: http://gcc.gnu.org/bugs.html#nonbugs_cxx
@@ -113,17 +116,34 @@ class MessageGenerator {
   // Generate standard Message methods.
   void GenerateClear(io::Printer* p);
   void GenerateOneofClear(io::Printer* p);
+  void GenerateVerifyDecl(io::Printer* p);
   void GenerateVerify(io::Printer* p);
+  void GenerateAnnotationDecl(io::Printer* p);
   void GenerateSerializeWithCachedSizes(io::Printer* p);
   void GenerateSerializeWithCachedSizesToArray(io::Printer* p);
   void GenerateSerializeWithCachedSizesBody(io::Printer* p);
   void GenerateSerializeWithCachedSizesBodyShuffled(io::Printer* p);
   void GenerateByteSize(io::Printer* p);
-  void GenerateMergeFrom(io::Printer* p);
+  void GenerateClassData(io::Printer* p);
+  void GenerateMapEntryClassDefinition(io::Printer* p);
+  void GenerateAnyMethodDefinition(io::Printer* p);
+  void GenerateImplDefinition(io::Printer* p);
   void GenerateClassSpecificMergeImpl(io::Printer* p);
   void GenerateCopyFrom(io::Printer* p);
   void GenerateSwap(io::Printer* p);
   void GenerateIsInitialized(io::Printer* p);
+  bool NeedsIsInitialized();
+
+  struct NewOpRequirements {
+    // Some field is initialized to non-zero values. Eg string fields pointing
+    // to default string.
+    bool needs_memcpy = false;
+    // Some field has a copy of the arena.
+    bool needs_arena_seeding = false;
+    // Some field has logic that needs to run.
+    bool needs_to_run_constructor = false;
+  };
+  NewOpRequirements GetNewOp(io::Printer* arena_emitter) const;
 
   // Helpers for GenerateSerializeWithCachedSizes().
   //
@@ -149,13 +169,12 @@ class MessageGenerator {
   void GenerateFieldClear(const FieldDescriptor* field, bool is_inline,
                           io::Printer* p);
 
+  // Returns true if any of the fields needs an `arena` variable containing
+  // the current message's arena, reducing `GetArena()` call churn.
+  bool RequiresArena(GeneratorFunction function) const;
+
   // Returns whether impl_ has a copy ctor.
   bool ImplHasCopyCtor() const;
-
-  // Generates the body of the message's copy constructor.
-  void GenerateCopyConstructorBody(io::Printer* p) const;
-  void GenerateCopyConstructorBodyImpl(io::Printer* p) const;
-  void GenerateCopyConstructorBodyOneofs(io::Printer* p) const;
 
   // Returns the level that this message needs ArenaDtor. If the message has
   // a field that is not arena-exclusive, it needs an ArenaDtor
@@ -177,6 +196,12 @@ class MessageGenerator {
   int HasByteIndex(const FieldDescriptor* field) const;
   int HasWordIndex(const FieldDescriptor* field) const;
   std::vector<uint32_t> RequiredFieldsBitMask() const;
+
+  // Helper functions to reduce nesting levels of deep Emit calls.
+  void EmitCheckAndUpdateByteSizeForField(const FieldDescriptor* field,
+                                          io::Printer* p) const;
+  void EmitUpdateByteSizeForField(const FieldDescriptor* field, io::Printer* p,
+                                  int& cached_has_word_index) const;
 
   const Descriptor* descriptor_;
   int index_in_file_messages_;

@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,10 +16,10 @@
 
 #include <cstdint>
 #include <functional>
-#include <utility>
 #include <vector>
 
 #include "ortools/base/int_type.h"
+#include "ortools/util/piecewise_linear_function.h"
 
 namespace operations_research {
 
@@ -37,6 +37,7 @@ DEFINE_INT_TYPE(RoutingCostClassIndex, int);
 DEFINE_INT_TYPE(RoutingDimensionIndex, int);
 DEFINE_INT_TYPE(RoutingDisjunctionIndex, int);
 DEFINE_INT_TYPE(RoutingVehicleClassIndex, int);
+DEFINE_INT_TYPE(RoutingResourceClassIndex, int);
 
 /// Pickup and delivery pair representation, including alternatives for pickups
 /// and deliveries respectively.
@@ -47,6 +48,9 @@ struct PickupDeliveryPair {
 
 typedef std::function<int64_t(int64_t)> RoutingTransitCallback1;
 typedef std::function<int64_t(int64_t, int64_t)> RoutingTransitCallback2;
+typedef std::function<const FloatSlopePiecewiseLinearFunction*(int64_t,
+                                                               int64_t)>
+    RoutingCumulDependentTransitCallback2;
 
 }  // namespace operations_research
 

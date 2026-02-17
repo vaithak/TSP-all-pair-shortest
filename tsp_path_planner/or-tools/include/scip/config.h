@@ -2,11 +2,11 @@
 #define __CONFIG_H__
 
 #define CMAKE_BUILD_TYPE "Release"
-#define SCIP_VERSION_MAJOR 8
-#define SCIP_VERSION_MINOR 0
-#define SCIP_VERSION_PATCH 4
+#define SCIP_VERSION_MAJOR 9
+#define SCIP_VERSION_MINOR 2
+#define SCIP_VERSION_PATCH 0
 #define SCIP_VERSION_SUB 0
-#define SCIP_VERSION_API 104
+#define SCIP_VERSION_API 115
 /* #undef BMS_NOBLOCKMEM */
 /* #undef SCIP_NOBUFFERMEM */
 /* #undef WITH_DEBUG_SOLUTION */
@@ -17,6 +17,7 @@
 /* #undef TPI_OMP */
 #define SCIP_THREADSAFE
 #define WITH_SCIPDEF
+/* #undef SCIP_WITH_LAPACK */
 /* #undef SCIP_WITH_PAPILO */
 /* #undef SCIP_WITH_ZLIB */
 /* #undef SCIP_WITH_READLINE */

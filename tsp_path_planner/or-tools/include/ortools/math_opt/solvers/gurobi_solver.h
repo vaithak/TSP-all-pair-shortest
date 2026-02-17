@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -32,7 +32,6 @@
 #include "ortools/math_opt/callback.pb.h"
 #include "ortools/math_opt/core/invalid_indicators.h"
 #include "ortools/math_opt/core/inverted_bounds.h"
-#include "ortools/math_opt/core/solve_interrupter.h"
 #include "ortools/math_opt/core/solver_interface.h"
 #include "ortools/math_opt/infeasible_subsystem.pb.h"
 #include "ortools/math_opt/model.pb.h"
@@ -45,6 +44,7 @@
 #include "ortools/math_opt/solvers/gurobi_callback.h"
 #include "ortools/math_opt/solvers/message_callback_data.h"
 #include "ortools/math_opt/sparse_containers.pb.h"
+#include "ortools/util/solve_interrupter.h"
 
 namespace operations_research {
 namespace math_opt {
@@ -60,12 +60,12 @@ class GurobiSolver : public SolverInterface {
       const ModelSolveParametersProto& model_parameters,
       MessageCallback message_cb,
       const CallbackRegistrationProto& callback_registration, Callback cb,
-      SolveInterrupter* interrupter) override;
+      const SolveInterrupter* interrupter) override;
   absl::StatusOr<bool> Update(const ModelUpdateProto& model_update) override;
   absl::StatusOr<ComputeInfeasibleSubsystemResultProto>
   ComputeInfeasibleSubsystem(const SolveParametersProto& parameters,
                              MessageCallback message_cb,
-                             SolveInterrupter* interrupter) override;
+                             const SolveInterrupter* interrupter) override;
 
  private:
   struct GurobiCallbackData {
@@ -199,8 +199,12 @@ class GurobiSolver : public SolverInterface {
       const ModelSolveParametersProto& model_parameters);
   absl::StatusOr<SolveStatsProto> GetSolveStats(absl::Time start) const;
 
-  absl::StatusOr<double> GetBestDualBound();
-  absl::StatusOr<double> GetBestPrimalBound(bool has_primal_feasible_solution);
+  absl::StatusOr<double> GetGurobiBestDualBound() const;
+  absl::StatusOr<double> GetBestDualBound(
+      absl::Span<const SolutionProto> solutions) const;
+  absl::StatusOr<double> GetBestPrimalBound(
+      absl::Span<const SolutionProto> solutions) const;
+
   bool PrimalSolutionQualityAvailable() const;
   absl::StatusOr<double> GetPrimalSolutionQuality() const;
 
@@ -226,7 +230,8 @@ class GurobiSolver : public SolverInterface {
   absl::StatusOr<bool> IsMaximize() const;
 
   absl::StatusOr<TerminationProto> ConvertTerminationReason(
-      int gurobi_status, SolutionClaims solution_claims);
+      int gurobi_status, SolutionClaims solution_claims,
+      double best_primal_bound, double best_dual_bound);
 
   // Returns solution information appropriate and available for an LP (linear
   // constraints + linear objective, only).
@@ -251,11 +256,13 @@ class GurobiSolver : public SolverInterface {
   GetConvexPrimalSolutionIfAvailable(
       const ModelSolveParametersProto& model_parameters);
   absl::StatusOr<SolutionAndClaim<DualSolutionProto>>
-  GetLpDualSolutionIfAvailable(
+  GetConvexDualSolutionIfAvailable(
       const ModelSolveParametersProto& model_parameters);
   absl::StatusOr<std::optional<BasisProto>> GetBasisIfAvailable();
 
-  absl::Status SetParameters(const SolveParametersProto& parameters);
+  absl::Status SetParameters(
+      const SolveParametersProto& parameters,
+      const ModelSolveParametersProto& model_parameters = {});
   absl::Status AddNewLinearConstraints(
       const LinearConstraintsProto& constraints);
   absl::Status AddNewQuadraticConstraints(
@@ -347,7 +354,7 @@ class GurobiSolver : public SolverInterface {
   absl::StatusOr<std::unique_ptr<GurobiCallbackData>> RegisterCallback(
       const CallbackRegistrationProto& registration, Callback cb,
       MessageCallback message_cb, absl::Time start,
-      SolveInterrupter* interrupter);
+      SolveInterrupter* local_interrupter);
 
   // Returns the ids of variables and linear constraints with inverted bounds.
   absl::StatusOr<InvertedBounds> ListInvertedBounds() const;
@@ -378,6 +385,13 @@ class GurobiSolver : public SolverInterface {
   // up the stack to a bridge.
   absl::StatusOr<VariableEqualToExpression>
   CreateSlackVariableEqualToExpression(const LinearExpressionProto& expression);
+
+  // May only be called if `is_multi_objective_mode()` is true.
+  absl::Status SetMultiObjectiveParameters(
+      const ModelSolveParametersProto& model_parameters);
+
+  absl::Status ResetModelParameters(
+      const ModelSolveParametersProto& model_parameters);
 
   const std::unique_ptr<Gurobi> gurobi_;
 

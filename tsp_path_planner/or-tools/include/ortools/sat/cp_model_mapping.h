@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -14,20 +14,15 @@
 #ifndef OR_TOOLS_SAT_CP_MODEL_MAPPING_H_
 #define OR_TOOLS_SAT_CP_MODEL_MAPPING_H_
 
-#include <cstdint>
-#include <functional>
 #include <vector>
 
-#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/log/check.h"
-#include "absl/meta/type_traits.h"
 #include "ortools/base/logging.h"
 #include "ortools/base/strong_vector.h"
-#include "ortools/base/types.h"
 #include "ortools/sat/cp_model.pb.h"
 #include "ortools/sat/cp_model_utils.h"
-#include "ortools/sat/integer.h"
+#include "ortools/sat/integer_base.h"
 #include "ortools/sat/intervals.h"
 #include "ortools/sat/linear_constraint.h"
 #include "ortools/sat/model.h"
@@ -58,6 +53,10 @@ struct ObjectiveDefinition {
 
   double ScaleIntegerObjective(IntegerValue value) const {
     return (ToDouble(value) + offset) * scaling_factor;
+  }
+
+  double ScaleObjective(double value) const {
+    return (value + offset) * scaling_factor;
   }
 };
 
@@ -112,6 +111,7 @@ class CpModelMapping {
   template <typename List>
   std::vector<IntegerVariable> Integers(const List& list) const {
     std::vector<IntegerVariable> result;
+    result.reserve(list.size());
     for (const auto i : list) result.push_back(Integer(i));
     return result;
   }
@@ -119,6 +119,7 @@ class CpModelMapping {
   template <typename ProtoIndices>
   std::vector<sat::Literal> Literals(const ProtoIndices& indices) const {
     std::vector<sat::Literal> result;
+    result.reserve(indices.size());
     for (const int i : indices) result.push_back(CpModelMapping::Literal(i));
     return result;
   }
@@ -126,6 +127,7 @@ class CpModelMapping {
   template <typename List>
   std::vector<AffineExpression> Affines(const List& list) const {
     std::vector<AffineExpression> result;
+    result.reserve(list.size());
     for (const auto& i : list) result.push_back(Affine(i));
     return result;
   }
@@ -133,6 +135,7 @@ class CpModelMapping {
   template <typename ProtoIndices>
   std::vector<IntervalVariable> Intervals(const ProtoIndices& indices) const {
     std::vector<IntervalVariable> result;
+    result.reserve(indices.size());
     for (const int i : indices) result.push_back(Interval(i));
     return result;
   }
@@ -162,6 +165,13 @@ class CpModelMapping {
   int GetProtoVariableFromIntegerVariable(IntegerVariable var) const {
     if (var.value() >= reverse_integer_map_.size()) return -1;
     return reverse_integer_map_[var];
+  }
+
+  // This one should only be used when we have a mapping.
+  int GetProtoLiteralFromLiteral(sat::Literal lit) const {
+    const int proto_var = GetProtoVariableFromBooleanVariable(lit.Variable());
+    DCHECK_NE(proto_var, -1);
+    return lit.IsPositive() ? proto_var : NegatedRef(proto_var);
   }
 
   const std::vector<IntegerVariable>& GetVariableMapping() const {
@@ -212,8 +222,8 @@ class CpModelMapping {
   // Recover from a IntervalVariable/BooleanVariable its associated CpModelProto
   // index. The value of -1 is used to indicate that there is no correspondence
   // (i.e. this variable is only used internally).
-  absl::StrongVector<BooleanVariable, int> reverse_boolean_map_;
-  absl::StrongVector<IntegerVariable, int> reverse_integer_map_;
+  util_intops::StrongVector<BooleanVariable, int> reverse_boolean_map_;
+  util_intops::StrongVector<IntegerVariable, int> reverse_integer_map_;
 
   // Set of constraints to ignore because they were already dealt with by
   // ExtractEncoding().

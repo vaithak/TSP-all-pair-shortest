@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -57,6 +57,8 @@
 #include <limits>
 #include <ostream>  // NOLINT
 
+#include "absl/base/attributes.h"
+#include "absl/base/port.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
 
@@ -94,7 +96,7 @@ namespace operations_research {
 // index and int64_t type.
 
 #define STRONG_ASSIGNMENT_OP(StrongClass, IntType, op) \
-  ThisType& operator op(const ThisType& arg_value) {   \
+  ThisType& operator op(const ThisType & arg_value) {  \
     value_ op arg_value.value();                       \
     return *this;                                      \
   }                                                    \
@@ -214,6 +216,7 @@ class StrongInt64 {
   }
 
   constexpr int64_t value() const { return value_; }
+  int64_t* mutable_value() { return &value_; }
 
   template <typename ValType>  // Needed for StrongVector.
   constexpr ValType value() const {

@@ -3,7 +3,7 @@
 /*                  This file is part of the program and library             */
 /*         SCIP --- Solving Constraint Integer Programs                      */
 /*                                                                           */
-/*  Copyright (c) 2002-2023 Zuse Institute Berlin (ZIB)                      */
+/*  Copyright (c) 2002-2024 Zuse Institute Berlin (ZIB)                      */
 /*                                                                           */
 /*  Licensed under the Apache License, Version 2.0 (the "License");          */
 /*  you may not use this file except in compliance with the License.         */
@@ -65,6 +65,7 @@ typedef struct SCIP_ConshdlrData SCIP_CONSHDLRDATA; /**< constraint handler data
 typedef struct SCIP_ConsData SCIP_CONSDATA;       /**< locally defined constraint type specific data */
 typedef struct SCIP_ConsSetChg SCIP_CONSSETCHG;   /**< tracks additions and removals of the set of active constraints */
 typedef struct SCIP_LinConsStats SCIP_LINCONSSTATS; /**< linear constraint classification statistics used for MIPLIB */
+typedef struct SYM_Graph SYM_GRAPH;               /**< data to encode a symmetry detection graph */
 
 /** linear constraint types recognizable */
 enum SCIP_LinConstype
@@ -234,7 +235,7 @@ typedef enum SCIP_LinConstype SCIP_LINCONSTYPE;
  *  - conshdlr        : the constraint handler itself
  *  - sourcecons      : source constraint to transform
  *  - targetcons      : pointer to store created target constraint
- */ 
+ */
 #define SCIP_DECL_CONSTRANS(x) SCIP_RETCODE x (SCIP* scip, SCIP_CONSHDLR* conshdlr, SCIP_CONS* sourcecons, SCIP_CONS** targetcons)
 
 /** LP initialization method of constraint handler (called before the initial LP relaxation at a node is solved)
@@ -433,7 +434,7 @@ typedef enum SCIP_LinConstype SCIP_LINCONSTYPE;
 /** feasibility check method of constraint handler for integral solutions
  *
  *  The given solution has to be checked for feasibility.
- *  
+ *
  *  The check methods of the active constraint handlers are called in decreasing order of their check
  *  priorities until the first constraint handler returned with the result SCIP_INFEASIBLE.
  *  The integrality constraint handler has a check priority of zero. A constraint handler which can
@@ -803,7 +804,7 @@ typedef enum SCIP_LinConstype SCIP_LINCONSTYPE;
  *  - global          : should a global or a local copy be created?
  *
  *  output:
- *  - valid           : pointer to store whether the copying was valid or not 
+ *  - valid           : pointer to store whether the copying was valid or not
  */
 #define SCIP_DECL_CONSCOPY(x) SCIP_RETCODE x (SCIP* scip, SCIP_CONS** cons, const char* name, \
       SCIP* sourcescip, SCIP_CONSHDLR* sourceconshdlr, SCIP_CONS* sourcecons, SCIP_HASHMAP* varmap, SCIP_HASHMAP* consmap, \
@@ -917,6 +918,42 @@ typedef enum SCIP_LinConstype SCIP_LINCONSTYPE;
  */
 #define SCIP_DECL_CONSGETDIVEBDCHGS(x) SCIP_RETCODE x (SCIP* scip, SCIP_CONSHDLR* conshdlr, SCIP_DIVESET* diveset, \
       SCIP_SOL* sol, SCIP_Bool* success, SCIP_Bool* infeasible)
+
+/** constraint handler method which returns the permutation symmetry detection graph of a constraint (if possible)
+ *
+ *  The constraint handler can (this callback is optional) provide this callback to return a graph that encodes the
+ *  permutation symmetries of a constraint. If this is not possible, the success pointer has to be set to FALSE or the
+ *  callback should not be implemented.
+ *
+ *  input:
+ *  - scip            : SCIP main data structure
+ *  - conshdlr        : the constraint handler itself
+ *  - cons            : constraint for which the symmetry detection graph is requested
+ *
+ *  output:
+ *  - graph           : symmetry detection graph
+ *  - success         : pointer to store whether the constraint successfully returned the symmetry detection graph
+ */
+#define SCIP_DECL_CONSGETPERMSYMGRAPH(x) SCIP_RETCODE x (SCIP* scip, SCIP_CONSHDLR* conshdlr, SCIP_CONS* cons, \
+      SYM_GRAPH* graph, SCIP_Bool* success)
+
+/** constraint handler method providing the signed permutation symmetry detection graph of a constraint (if possible)
+ *
+ *  The constraint handler can (this callback is optional) provide this callback to return a graph that encodes the
+ *  signed permutation symmetries of a constraint. If this is not possible, the success pointer has to be set to FALSE
+ *  or the callback should not be implemented.
+ *
+ *  input:
+ *  - scip            : SCIP main data structure
+ *  - conshdlr        : the constraint handler itself
+ *  - cons            : constraint for which the symmetry detection graph is requested
+ *
+ *  output:
+ *  - graph           : symmetry detection graph
+ *  - success         : pointer to store whether the constraint successfully returned the symmetry detection graph
+ */
+#define SCIP_DECL_CONSGETSIGNEDPERMSYMGRAPH(x) SCIP_RETCODE x (SCIP* scip, SCIP_CONSHDLR* conshdlr, SCIP_CONS* cons, \
+      SYM_GRAPH* graph, SCIP_Bool* success)
 
 #ifdef __cplusplus
 }

@@ -3,7 +3,7 @@
 /*                  This file is part of the program and library             */
 /*         SCIP --- Solving Constraint Integer Programs                      */
 /*                                                                           */
-/*  Copyright (c) 2002-2023 Zuse Institute Berlin (ZIB)                      */
+/*  Copyright (c) 2002-2024 Zuse Institute Berlin (ZIB)                      */
 /*                                                                           */
 /*  Licensed under the Apache License, Version 2.0 (the "License");          */
 /*  you may not use this file except in compliance with the License.         */
@@ -265,6 +265,16 @@ SCIP_RETCODE SCIPparamsetSetString(
    const char*           value               /**< new value of the parameter */
    );
 
+/** changes the value of an existing parameter */
+SCIP_RETCODE SCIPparamsetSet(
+   SCIP_PARAMSET*        paramset,           /**< parameter set */
+   SCIP_SET*             set,                /**< global SCIP settings */
+   SCIP_MESSAGEHDLR*     messagehdlr,        /**< message handler */
+   const char*           name,               /**< name of the parameter */
+   const char*           value,              /**< new value of the parameter as string */
+   SCIP_Bool             fix                 /**< whether to fix parameter */
+   );
+
 /** changes the default value of an existing SCIP_Bool parameter */
 SCIP_RETCODE SCIPparamsetSetDefaultBool(
    SCIP_PARAMSET*        paramset,           /**< parameter set */
@@ -523,6 +533,7 @@ SCIP_RETCODE SCIPparamSetString(
    SCIP_SET*             set,                /**< global SCIP settings, or NULL if param change method should not be called */
    SCIP_MESSAGEHDLR*     messagehdlr,        /**< message handler */
    const char*           value,              /**< new value of the parameter */
+   SCIP_Bool             initialize,         /**< is this the initialization of the parameter? */
    SCIP_Bool             quiet               /**< should the parameter be set quiet (no output) */
    );
 

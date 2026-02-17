@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -28,14 +28,11 @@
 #include <utility>
 #include <vector>
 
-#include "absl/container/flat_hash_map.h"
+#include "absl/base/attributes.h"
 #include "absl/log/check.h"
-#include "absl/strings/string_view.h"
 #include "absl/types/span.h"
-#include "ortools/base/hash.h"
 #include "ortools/base/logging.h"
 #include "ortools/base/timer.h"
-#include "ortools/base/types.h"
 #include "ortools/sat/clause.h"
 #include "ortools/sat/drat_proof_handler.h"
 #include "ortools/sat/model.h"
@@ -109,16 +106,21 @@ class SatSolver {
   bool AddBinaryClause(Literal a, Literal b);
   bool AddTernaryClause(Literal a, Literal b, Literal c);
 
-  // Adds a clause to the problem. Returns false if the problem is detected to
-  // be UNSAT.
-  // If is_safe is false, we will do some basic presolving like removing
-  // duplicate literals.
+  // Adds a clause to the problem.
+  // Returns false if the problem is detected to be UNSAT.
   //
-  // TODO(user): Rename this to AddClause(), also get rid of the specialized
+  // This must only be called at level zero, use AddClauseDuringSearch() for
+  // adding clause at a positive level.
+  //
+  // We call this a "problem" clause just because we will never delete such
+  // clause unless it is proven to always be satisfied. So this can be called
+  // with the initial clause of a problem, but also infered clause that we
+  // don't want to delete.
+  //
+  // TODO(user): Rename this to AddClause() ? Also get rid of the specialized
   // AddUnitClause(), AddBinaryClause() and AddTernaryClause() since they
   // just end up calling this?
-  bool AddProblemClause(absl::Span<const Literal> literals,
-                        bool is_safe = true);
+  bool AddProblemClause(absl::Span<const Literal> literals);
 
   // Adds a pseudo-Boolean constraint to the problem. Returns false if the
   // problem is detected to be UNSAT. If the constraint is always true, this
@@ -160,21 +162,14 @@ class SatSolver {
   //
   // TODO(user): Clean this up by making clients directly talk to
   // SatDecisionPolicy.
-  void SetAssignmentPreference(Literal literal, double weight) {
+  void SetAssignmentPreference(Literal literal, float weight) {
     decision_policy_->SetAssignmentPreference(literal, weight);
   }
-  std::vector<std::pair<Literal, double>> AllPreferences() const {
+  std::vector<std::pair<Literal, float>> AllPreferences() const {
     return decision_policy_->AllPreferences();
   }
   void ResetDecisionHeuristic() {
     return decision_policy_->ResetDecisionHeuristic();
-  }
-  void ResetDecisionHeuristicAndSetAllPreferences(
-      const std::vector<std::pair<Literal, double>>& prefs) {
-    decision_policy_->ResetDecisionHeuristic();
-    for (const std::pair<Literal, double>& p : prefs) {
-      decision_policy_->SetAssignmentPreference(p.first, p.second);
-    }
   }
 
   // Solves the problem and returns its status.
@@ -239,6 +234,10 @@ class SatSolver {
   // previously enqueued decisions that cannot be taken together without making
   // the problem UNSAT.
   std::vector<Literal> GetLastIncompatibleDecisions();
+
+  // Returns a subset of decisions that are sufficient to ensure all literals in
+  // `literals` are fixed to their current value.
+  std::vector<Literal> GetDecisionsFixing(absl::Span<const Literal> literals);
 
   // Advanced usage. The next 3 functions allow to drive the search from outside
   // the solver.
@@ -375,7 +374,7 @@ class SatSolver {
   // Functions to manage the set of learned binary clauses.
   // Only clauses added/learned when TrackBinaryClause() is true are managed.
   void TrackBinaryClauses(bool value) { track_binary_clauses_ = value; }
-  bool AddBinaryClauses(const std::vector<BinaryClause>& clauses);
+  bool AddBinaryClauses(absl::Span<const BinaryClause> clauses);
   const std::vector<BinaryClause>& NewlyAddedBinaryClauses();
   void ClearNewlyAddedBinaryClauses();
 
@@ -397,11 +396,42 @@ class SatSolver {
   int64_t num_branches() const;
   int64_t num_failures() const;
   int64_t num_propagations() const;
+  int64_t num_backtracks() const;
 
   // Note that we count the number of backtrack to level zero from a positive
   // level. Those can corresponds to actual restarts, or conflicts that learn
   // unit clauses or any other reason that trigger such backtrack.
   int64_t num_restarts() const;
+
+  // Access to all counters.
+  // Tracks various information about the solver progress.
+  struct Counters {
+    int64_t num_branches = 0;
+    int64_t num_failures = 0;
+    int64_t num_restarts = 0;
+    int64_t num_backtracks = 0;
+
+    // Minimization stats.
+    int64_t num_minimizations = 0;
+    int64_t num_literals_removed = 0;
+
+    // PB constraints.
+    int64_t num_learned_pb_literals = 0;
+
+    // Clause learning /deletion stats.
+    int64_t num_literals_learned = 0;
+    int64_t num_literals_forgotten = 0;
+    int64_t num_subsumed_clauses = 0;
+
+    // TryToMinimizeClause() stats.
+    int64_t minimization_num_clauses = 0;
+    int64_t minimization_num_decisions = 0;
+    int64_t minimization_num_true = 0;
+    int64_t minimization_num_subsumed = 0;
+    int64_t minimization_num_removed_literals = 0;
+    int64_t minimization_num_reused = 0;
+  };
+  Counters counters() const { return counters_; }
 
   // A deterministic number that should be correlated with the time spent in
   // the Solve() function. The order of magnitude should be close to the time
@@ -414,9 +444,7 @@ class SatSolver {
   // debug mode, and after this is called, all the learned clauses are tested to
   // satisfy this saved assignment.
   void SaveDebugAssignment();
-
-  // Returns true iff the loaded problem only contains clauses.
-  bool ProblemIsPureSat() const { return problem_is_pure_sat_; }
+  void LoadDebugSolution(absl::Span<const Literal> solution);
 
   void SetDratProofHandler(DratProofHandler* drat_proof_handler) {
     drat_proof_handler_ = drat_proof_handler;
@@ -445,15 +473,8 @@ class SatSolver {
   // Mainly visible for testing.
   ABSL_MUST_USE_RESULT bool Propagate();
 
-  // This must be called at level zero. It will spend the given num decision and
-  // use propagation to try to minimize some clauses from the database.
-  void MinimizeSomeClauses(int decisions_budget);
-
-  // Sets the export function to the shared clauses manager.
-  void SetShareBinaryClauseCallback(const std::function<void(Literal, Literal)>&
-                                        shared_binary_clauses_callback) {
-    shared_binary_clauses_callback_ = shared_binary_clauses_callback;
-  }
+  bool MinimizeByPropagation(double dtime,
+                             bool minimize_new_clauses_only = false);
 
   // Advance the given time limit with all the deterministic time that was
   // elapsed since last call.
@@ -484,24 +505,25 @@ class SatSolver {
   // exposed to allow processing a conflict detected outside normal propagation.
   void ProcessCurrentConflict();
 
+  void EnsureNewClauseIndexInitialized() {
+    clauses_propagator_->EnsureNewClauseIndexInitialized();
+  }
+
  private:
   // All Solve() functions end up calling this one.
   Status SolveInternal(TimeLimit* time_limit, int64_t max_number_of_conflicts);
 
   // Adds a binary clause to the BinaryImplicationGraph and to the
   // BinaryClauseManager when track_binary_clauses_ is true.
-  //
-  // If export_clause is true, then we will also export_clause that to a
-  // potential shared_binary_clauses_callback_.
-  void AddBinaryClauseInternal(Literal a, Literal b, bool export_clause);
+  void AddBinaryClauseInternal(Literal a, Literal b);
 
   // See SaveDebugAssignment(). Note that these functions only consider the
   // variables at the time the debug_assignment_ was saved. If new variables
   // were added since that time, they will be considered unassigned.
   bool ClauseIsValidUnderDebugAssignment(
-      const std::vector<Literal>& clause) const;
+      absl::Span<const Literal> clause) const;
   bool PBConstraintIsValidUnderDebugAssignment(
-      const std::vector<LiteralWithCoeff>& cst, Coefficient rhs) const;
+      absl::Span<const LiteralWithCoeff> cst, Coefficient rhs) const;
 
   // Logs the given status if parameters_.log_search_progress() is true.
   // Also returns it.
@@ -609,10 +631,6 @@ class SatSolver {
   // Update the propagators_ list with the relevant propagators.
   void InitializePropagators();
 
-  // Unrolls the trail until a given point. This unassign the assigned variables
-  // and add them to the priority queue with the correct weight.
-  void Untrail(int target_trail_index);
-
   // Output to the DRAT proof handler any newly fixed variables.
   void ProcessNewlyFixedVariablesForDratProof();
 
@@ -640,7 +658,7 @@ class SatSolver {
   // Fills literals with all the literals in the reasons of the literals in the
   // given input. The output vector will have no duplicates and will not contain
   // the literals already present in the input.
-  void ComputeUnionOfReasons(const std::vector<Literal>& input,
+  void ComputeUnionOfReasons(absl::Span<const Literal> input,
                              std::vector<Literal>* literals);
 
   // Do the full pseudo-Boolean constraint analysis. This calls multiple
@@ -656,12 +674,10 @@ class SatSolver {
   // function choose which one of the other functions to call depending on the
   // parameters.
   //
-  // Precondidtion: is_marked_ should be set to true for all the variables of
+  // Precondition: is_marked_ should be set to true for all the variables of
   // the conflict. It can also contains false non-conflict variables that
   // are implied by the negation of the 1-UIP conflict literal.
-  void MinimizeConflict(
-      std::vector<Literal>* conflict,
-      std::vector<Literal>* reason_used_to_infer_the_conflict);
+  void MinimizeConflict(std::vector<Literal>* conflict);
   void MinimizeConflictExperimental(std::vector<Literal>* conflict);
   void MinimizeConflictSimple(std::vector<Literal>* conflict);
   void MinimizeConflictRecursively(std::vector<Literal>* conflict);
@@ -673,12 +689,12 @@ class SatSolver {
   // - There is an unique literal with the highest decision level.
   // - This literal appears in the first position.
   // - All the other literals are of smaller decision level.
-  // - Ther is no literal with a decision level of zero.
-  bool IsConflictValid(const std::vector<Literal>& literals);
+  // - There is no literal with a decision level of zero.
+  bool IsConflictValid(absl::Span<const Literal> literals);
 
   // Given the learned clause after a conflict, this computes the correct
   // backtrack level to call Backtrack() with.
-  int ComputeBacktrackLevel(const std::vector<Literal>& literals);
+  int ComputeBacktrackLevel(absl::Span<const Literal> literals);
 
   // The LBD (Literal Blocks Distance) is the number of different decision
   // levels at which the literals of the clause were assigned. Note that we
@@ -702,7 +718,7 @@ class SatSolver {
 
   // Activity management for clauses. This work the same way at the ones for
   // variables, but with different parameters.
-  void BumpReasonActivities(const std::vector<Literal>& literals);
+  void BumpReasonActivities(absl::Span<const Literal> literals);
   void BumpClauseActivity(SatClause* clause);
   void RescaleClauseActivities(double scaling_factor);
   void UpdateClauseActivityIncrement();
@@ -711,14 +727,16 @@ class SatSolver {
   std::string StatusString(Status status) const;
   std::string RunningStatisticsString() const;
 
-  // Marks as "non-deletable" all clauses that were used to infer the given
-  // variable. The variable must be currently assigned.
-  void KeepAllClauseUsedToInfer(BooleanVariable variable);
+  // Returns true if variable is fixed in the current assignment due to
+  // non-removable clauses, plus at most one removable clause with size <=
+  // max_size.
+  bool SubsumptionIsInteresting(BooleanVariable variable, int max_size);
+  void KeepAllClausesUsedToInfer(BooleanVariable variable);
 
   // Use propagation to try to minimize the given clause. This is really similar
-  // to MinimizeCoreWithPropagation(). It must be called when the current
-  // decision level is zero. Note that because this do a small tree search, it
-  // will impact the variable/clauses activities and may add new conflicts.
+  // to MinimizeCoreWithPropagation(). Note that because this does a small tree
+  // search, it will impact the variable/clause activities and may add new
+  // conflicts.
   void TryToMinimizeClause(SatClause* clause);
 
   // This is used by the old non-model constructor.
@@ -730,7 +748,7 @@ class SatSolver {
   // Internal propagators. We keep them here because we need more than the
   // SatPropagator interface for them.
   BinaryImplicationGraph* binary_implication_graph_;
-  LiteralWatchers* clauses_propagator_;
+  ClauseManager* clauses_propagator_;
   PbConstraints* pb_constraints_;
 
   // Ordered list of propagators used by Propagate()/Untrail().
@@ -783,31 +801,6 @@ class SatSolver {
   // Used in ProcessNewlyFixedVariablesForDratProof().
   int drat_num_processed_fixed_variables_ = 0;
 
-  // Tracks various information about the solver progress.
-  struct Counters {
-    int64_t num_branches = 0;
-    int64_t num_failures = 0;
-    int64_t num_restarts = 0;
-
-    // Minimization stats.
-    int64_t num_minimizations = 0;
-    int64_t num_literals_removed = 0;
-
-    // PB constraints.
-    int64_t num_learned_pb_literals = 0;
-
-    // Clause learning /deletion stats.
-    int64_t num_literals_learned = 0;
-    int64_t num_literals_forgotten = 0;
-    int64_t num_subsumed_clauses = 0;
-
-    // TryToMinimizeClause() stats.
-    int64_t minimization_num_clauses = 0;
-    int64_t minimization_num_decisions = 0;
-    int64_t minimization_num_true = 0;
-    int64_t minimization_num_subsumed = 0;
-    int64_t minimization_num_removed_literals = 0;
-  };
   Counters counters_;
 
   // Solver information.
@@ -823,6 +816,8 @@ class SatSolver {
   // This counter is decremented each time we learn a clause that can be
   // deleted. When it reaches zero, a clause cleanup is triggered.
   int num_learned_clause_before_cleanup_ = 0;
+
+  int64_t minimization_by_propagation_threshold_ = 0;
 
   // Temporary members used during conflict analysis.
   SparseBitset<BooleanVariable> is_marked_;
@@ -869,15 +864,9 @@ class SatSolver {
   // it is necessary to keep track of the last time the time was advanced.
   double deterministic_time_at_last_advanced_time_limit_ = 0;
 
-  // This is true iff the loaded problem only contains clauses.
-  bool problem_is_pure_sat_;
-
   DratProofHandler* drat_proof_handler_;
 
   mutable StatsGroup stats_;
-
-  std::function<void(Literal, Literal)> shared_binary_clauses_callback_ =
-      nullptr;
 };
 
 // Tries to minimize the given UNSAT core with a really simple heuristic.
@@ -909,8 +898,9 @@ inline std::function<void(Model*)> BooleanLinearConstraint(
 
 inline std::function<void(Model*)> CardinalityConstraint(
     int64_t lower_bound, int64_t upper_bound,
-    const std::vector<Literal>& literals) {
-  return [=](Model* model) {
+    absl::Span<const Literal> literals) {
+  return [=, literals = std::vector<Literal>(literals.begin(), literals.end())](
+             Model* model) {
     std::vector<LiteralWithCoeff> cst;
     cst.reserve(literals.size());
     for (int i = 0; i < literals.size(); ++i) {
@@ -923,8 +913,9 @@ inline std::function<void(Model*)> CardinalityConstraint(
 }
 
 inline std::function<void(Model*)> ExactlyOneConstraint(
-    const std::vector<Literal>& literals) {
-  return [=](Model* model) {
+    absl::Span<const Literal> literals) {
+  return [=, literals = std::vector<Literal>(literals.begin(), literals.end())](
+             Model* model) {
     std::vector<LiteralWithCoeff> cst;
     cst.reserve(literals.size());
     for (const Literal l : literals) {
@@ -937,8 +928,9 @@ inline std::function<void(Model*)> ExactlyOneConstraint(
 }
 
 inline std::function<void(Model*)> AtMostOneConstraint(
-    const std::vector<Literal>& literals) {
-  return [=](Model* model) {
+    absl::Span<const Literal> literals) {
+  return [=, literals = std::vector<Literal>(literals.begin(), literals.end())](
+             Model* model) {
     std::vector<LiteralWithCoeff> cst;
     cst.reserve(literals.size());
     for (const Literal l : literals) {
@@ -953,8 +945,7 @@ inline std::function<void(Model*)> AtMostOneConstraint(
 inline std::function<void(Model*)> ClauseConstraint(
     absl::Span<const Literal> literals) {
   return [=](Model* model) {
-    model->GetOrCreate<SatSolver>()->AddProblemClause(literals,
-                                                      /*is_safe=*/false);
+    model->GetOrCreate<SatSolver>()->AddProblemClause(literals);
   };
 }
 
@@ -975,8 +966,9 @@ inline std::function<void(Model*)> Equality(Literal a, Literal b) {
 
 // r <=> (at least one literal is true). This is a reified clause.
 inline std::function<void(Model*)> ReifiedBoolOr(
-    const std::vector<Literal>& literals, Literal r) {
-  return [=](Model* model) {
+    absl::Span<const Literal> literals, Literal r) {
+  return [=, literals = std::vector<Literal>(literals.begin(), literals.end())](
+             Model* model) {
     std::vector<Literal> clause;
     for (const Literal l : literals) {
       model->Add(Implication(l, r));  // l => r.
@@ -1009,8 +1001,9 @@ inline std::function<void(Model*)> EnforcedClause(
 //
 // Note(user): we could have called ReifiedBoolOr() with everything negated.
 inline std::function<void(Model*)> ReifiedBoolAnd(
-    const std::vector<Literal>& literals, Literal r) {
-  return [=](Model* model) {
+    absl::Span<const Literal> literals, Literal r) {
+  return [=, literals = std::vector<Literal>(literals.begin(), literals.end())](
+             Model* model) {
     std::vector<Literal> clause;
     for (const Literal l : literals) {
       model->Add(Implication(r, l));  // r => l.

@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,12 +16,13 @@
 
 #include <functional>
 #include <string>
-#include <vector>
 
-#include "ortools/base/types.h"
+#include "absl/flags/declare.h"
 #include "ortools/sat/cp_model.pb.h"
 #include "ortools/sat/model.h"
 #include "ortools/sat/sat_parameters.pb.h"
+
+ABSL_DECLARE_FLAG(bool, cp_model_dump_response);
 
 namespace operations_research {
 namespace sat {
@@ -90,7 +91,28 @@ CpSolverResponse SolveWithParameters(const CpModelProto& model_proto,
  *  - etc...
  */
 std::function<void(Model*)> NewFeasibleSolutionObserver(
-    const std::function<void(const CpSolverResponse& response)>& observer);
+    const std::function<void(const CpSolverResponse& response)>& callback);
+
+/**
+ * Creates a callbacks that will append a string to the search log when
+ * reporting a new solution.
+ *
+ * The given function will be called on each improving feasible solution found
+ * during the search. For a non-optimization problem, if the option to find all
+ * solution was set, then this will be called on each new solution.
+ */
+std::function<void(Model*)> NewFeasibleSolutionLogCallback(
+    const std::function<std::string(const CpSolverResponse& response)>&
+        callback);
+
+/**
+ * Creates a callbacks that will be called on each new best objective bound
+ * found.
+ *
+ * Note that this function is called before the update takes place.
+ */
+std::function<void(Model*)> NewBestBoundCallback(
+    const std::function<void(double)>& callback);
 
 /**
  * Creates parameters for the solver, which you can add to the model with

@@ -1,4 +1,4 @@
-// Copyright 2010-2022 Google LLC
+// Copyright 2010-2025 Google LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -39,6 +39,14 @@ namespace operations_research::pdlp {
 // infinities. `constraint_upper_bounds` and `variable_upper_bounds` may
 // contain positive infinities. Other than that all entries of all fields must
 // be finite. The `objective_matrix` must be diagonal and non-negative.
+//
+// `variable_lower_bounds`, `variable_upper_bounds`, `objective_vector`,
+// `objective_matrix` (if it has a value), and `variable_names` (if it has a
+// value) must all have the same size as the number of columns in
+// `constraint_matrix`. `constraint_lower_bounds`, `constraint_upper_bounds`,
+// and `constraint_names` (if it has a value) must all have the same size as the
+// number of rows in `constraint_matrix`. Consistency of these values is checked
+// by `ValidateQuadraticProgramDimensions()`.
 //
 // For convenience, the struct also stores `scaling_factor` and
 // `objective_offset`. These factors can be used to transform objective values
@@ -150,12 +158,6 @@ inline bool IsLinearProgram(const QuadraticProgram& qp) {
   return !qp.objective_matrix.has_value();
 }
 
-// Checks if the lower and upper bounds of the problem are consistent, i.e. for
-// each variable and constraint bound we have `lower_bound <= upper_bound`. If
-// the input is consistent the method returns true, otherwise it returns false.
-// See also `HasValidBounds(const ShardedQuadraticProgram&)`.
-bool HasValidBounds(const QuadraticProgram& qp);
-
 // Converts an `MPModelProto` into a `QuadraticProgram`.
 // Returns an error if general constraints are present.
 // If `relax_integer_variables` is true integer variables are relaxed to
@@ -182,6 +184,12 @@ absl::Status CanFitInMpModelProto(const QuadraticProgram& qp);
 // `InvalidArgumentError` if `objective_scaling_factor` is zero or if
 // `CanFitInMpModelProto()` fails.
 absl::StatusOr<MPModelProto> QpToMpModelProto(const QuadraticProgram& qp);
+
+// Returns a "pretty" version of `qp`, truncating to at most `max_size`
+// characters. This is for debugging purposes only - the format may change
+// without notice. Although this output is vaguely similar to "LP format", it is
+// not actually compatible with "LP format".
+std::string ToString(const QuadraticProgram& qp, int64_t max_size = 1'000'000);
 
 // Like `matrix.setFromTriplets(triplets)`, except that `setFromTriplets`
 // results in having three copies of the nonzeros in memory at the same time,
