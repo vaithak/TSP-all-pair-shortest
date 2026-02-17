@@ -48,7 +48,22 @@ if HAS_PYBIND11 and os.path.exists(ORTOOLS_INCLUDE):
     print("Building C++ TSP solver extension...")
     
     # Determine platform-specific settings
-    extra_compile_args = ["-std=c++17", "-O3"]
+    # Use -isystem so bundled OR-Tools/protobuf headers take priority
+    # over any system-installed protobuf headers.
+    extra_compile_args = [
+        "-std=c++17", "-O3", "-fwrapv",
+        f"-isystem{os.path.abspath(ORTOOLS_INCLUDE)}",
+        # Definitions required by OR-Tools (from ortoolsTargets.cmake)
+        "-DOR_PROTO_DLL=",
+        "-DUSE_LP_PARSER",
+        "-DUSE_MATH_OPT",
+        "-DUSE_BOP",
+        "-DUSE_CBC",
+        "-DUSE_CLP",
+        "-DUSE_GLOP",
+        "-DUSE_PDLP",
+        "-DUSE_SCIP",
+    ]
     extra_link_args = []
     libraries = ["ortools"]
     
@@ -59,7 +74,7 @@ if HAS_PYBIND11 and os.path.exists(ORTOOLS_INCLUDE):
     
     ext_modules = [
         Pybind11Extension(
-            "_tsp_solver_cpp",
+            "tsp_path_planner._tsp_solver_cpp",
             sources=[
                 "tsp_path_planner/cpp/pybind_wrapper.cpp",
                 "tsp_path_planner/cpp/tsp_solver.cpp",
